@@ -20,11 +20,18 @@ struct cred;
 struct dentry;
 struct file_operations;
 struct file_system_type;
+struct mnt_namespace;
 struct net;
+struct pid_namespace;
+struct super_block;
 struct user_namespace;
+struct vfsmount;
+struct path;
 
 enum fs_context_purpose {
 	FS_CONTEXT_FOR_MOUNT,		/* New superblock for explicit mount */
+	FS_CONTEXT_FOR_SUBMOUNT,	/* New superblock for automatic submount */
+	FS_CONTEXT_FOR_RECONFIGURE,	/* Superblock reconfiguration (remount) */
 };
 
 /*
@@ -66,6 +73,7 @@ struct fs_parameter {
  * See Documentation/filesystems/mounting.txt
  */
 struct fs_context {
+	const struct fs_context_operations *ops;
 	struct file_system_type	*fs_type;
 	void			*fs_private;	/* The filesystem's context */
 	struct dentry		*root;		/* The root and superblock */
@@ -77,8 +85,17 @@ struct fs_context {
 	void			*security;	/* Linux S&M options */
 	unsigned int		sb_flags;	/* Proposed superblock flags (SB_*) */
 	unsigned int		sb_flags_mask;	/* Superblock flags that were changed */
+	unsigned int		lsm_flags;	/* Information flags from the fs to the LSM */
 	enum fs_context_purpose	purpose:8;
 	bool			need_free:1;	/* Need to call ops->free() */
+};
+
+struct fs_context_operations {
+	void (*free)(struct fs_context *fc);
+	int (*parse_param)(struct fs_context *fc, struct fs_parameter *param);
+	int (*parse_monolithic)(struct fs_context *fc, void *data);
+	int (*get_tree)(struct fs_context *fc);
+	int (*reconfigure)(struct fs_context *fc);
 };
 
 /*
@@ -86,8 +103,59 @@ struct fs_context {
  */
 extern struct fs_context *fs_context_for_mount(struct file_system_type *fs_type,
 						unsigned int sb_flags);
+extern struct fs_context *fs_context_for_reconfigure(struct dentry *dentry,
+						unsigned int sb_flags,
+						unsigned int sb_flags_mask);
+extern struct fs_context *fs_context_for_submount(struct file_system_type *fs_type,
+						struct dentry *reference);
 
+extern int vfs_parse_fs_param(struct fs_context *fc, struct fs_parameter *param);
+extern int vfs_parse_fs_string(struct fs_context *fc, const char *key,
+			       const char *value, size_t v_size);
+extern int generic_parse_monolithic(struct fs_context *fc, void *data);
 extern int vfs_get_tree(struct fs_context *fc);
 extern void put_fs_context(struct fs_context *fc);
+
+#define logfc(FC, FMT, ...) pr_notice(FMT, ## __VA_ARGS__)
+
+/**
+ * infof - Store supplementary informational message
+ * @fc: The context in which to log the informational message
+ * @fmt: The format string
+ *
+ * Store the supplementary informational message for the process if the process
+ * has enabled the facility.
+ */
+#define infof(fc, fmt, ...) ({ logfc(fc, fmt, ## __VA_ARGS__); })
+
+/**
+ * warnf - Store supplementary warning message
+ * @fc: The context in which to log the error message
+ * @fmt: The format string
+ *
+ * Store the supplementary warning message for the process if the process has
+ * enabled the facility.
+ */
+#define warnf(fc, fmt, ...) ({ logfc(fc, fmt, ## __VA_ARGS__); })
+
+/**
+ * errorf - Store supplementary error message
+ * @fc: The context in which to log the error message
+ * @fmt: The format string
+ *
+ * Store the supplementary error message for the process if the process has
+ * enabled the facility.
+ */
+#define errorf(fc, fmt, ...) ({ logfc(fc, fmt, ## __VA_ARGS__); })
+
+/**
+ * invalf - Store supplementary invalid argument error message
+ * @fc: The context in which to log the error message
+ * @fmt: The format string
+ *
+ * Store the supplementary error message for the process if the process has
+ * enabled the facility and return -EINVAL.
+ */
+#define invalf(fc, fmt, ...) ({	errorf(fc, fmt, ## __VA_ARGS__); -EINVAL; })
 
 #endif /* _LINUX_FS_CONTEXT_H */
