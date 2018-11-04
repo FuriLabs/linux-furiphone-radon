@@ -2580,6 +2580,7 @@ static int do_new_mount(struct path *path, const char *fstype, int sb_flags,
 			int mnt_flags, const char *name, void *data)
 {
 	struct file_system_type *type;
+	struct vfsmount *mnt;
 	struct fs_context *fc;
 	const char *subtype = NULL;
 	int err = 0;
@@ -2609,18 +2610,40 @@ static int do_new_mount(struct path *path, const char *fstype, int sb_flags,
 	if (IS_ERR(fc))
 		return PTR_ERR(fc);
 
-	if (subtype)
-		err = vfs_parse_fs_string(fc, "subtype",
-					  subtype, strlen(subtype));
-	if (!err && name)
-		err = vfs_parse_fs_string(fc, "source", name, strlen(name));
+	if (subtype) {
+		fc->subtype = kstrdup(subtype, GFP_KERNEL);
+		if (!fc->subtype)
+			err = -ENOMEM;
+	}
+	if (!err && name) {
+		fc->source = kstrdup(name, GFP_KERNEL);
+		if (!fc->source)
+			err = -ENOMEM;
+	}
 	if (!err)
 		err = parse_monolithic_mount_data(fc, data);
 	if (!err)
 		err = vfs_get_tree(fc);
-	if (!err)
-		err = do_new_mount_fc(fc, path, mnt_flags);
+	if (err)
+		goto out;
 
+	up_write(&fc->root->d_sb->s_umount);
+	mnt = vfs_create_mount(fc);
+	if (IS_ERR(mnt)) {
+		err = PTR_ERR(mnt);
+		goto out;
+	}
+
+	if (mount_too_revealing(mnt, &mnt_flags)) {
+		mntput(mnt);
+		err = -EPERM;
+		goto out;
+	}
+
+	err = do_add_mount(real_mount(mnt), path, mnt_flags);
+	if (err)
+		mntput(mnt);
+out:
 	put_fs_context(fc);
 	return err;
 }
