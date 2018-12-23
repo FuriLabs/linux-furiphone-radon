@@ -101,6 +101,13 @@ struct fs_context_operations {
 	int (*reconfigure)(struct fs_context *fc);
 };
 
+struct fs_context_operations {
+	void (*free)(struct fs_context *fc);
+	int (*parse_monolithic)(struct fs_context *fc, void *data);
+	int (*get_tree)(struct fs_context *fc);
+	int (*reconfigure)(struct fs_context *fc);
+};
+
 /*
  * fs_context manipulation functions.
  */
