@@ -46,11 +46,12 @@ enum {LAST_NORM, LAST_ROOT, LAST_DOT, LAST_DOTDOT, LAST_BIND};
 
 #define LOOKUP_JUMPED		0x1000
 #define LOOKUP_ROOT		0x2000
+#define LOOKUP_ROOT_GRABBED	0x0008
 #define LOOKUP_EMPTY		0x4000
 #define LOOKUP_DOWN		0x8000
 
 /* Scoping flags for lookup. */
-#define LOOKUP_NO_SYMLINKS      BIT(24) /* No symlink crossing. */
+#define LOOKUP_NO_SYMLINKS      0x010000 /* No symlink crossing. */
 #define LOOKUP_NO_MAGICLINKS    BIT(25) /* No nd_jump_link() crossing. */
 #define LOOKUP_NO_XDEV          BIT(26) /* No mountpoint crossing. */
 #define LOOKUP_BENEATH          BIT(27) /* No escaping from starting point. */
