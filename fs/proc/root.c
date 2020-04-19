@@ -23,23 +23,9 @@
 #include <linux/pid_namespace.h>
 #include <linux/parser.h>
 #include <linux/cred.h>
+#include <linux/slab.h>
 
 #include "internal.h"
-
-static int proc_test_super(struct super_block *sb, void *data)
-{
-	return sb->s_fs_info == data;
-}
-
-static int proc_set_super(struct super_block *sb, void *data)
-{
-	int err = set_anon_super(sb, NULL);
-	if (!err) {
-		struct pid_namespace *ns = (struct pid_namespace *)data;
-		sb->s_fs_info = get_pid_ns(ns);
-	}
-	return err;
-}
 
 enum {
 	Opt_gid, Opt_hidepid, Opt_subset, Opt_err,
@@ -59,7 +45,7 @@ static inline int valid_hidepid(unsigned int value)
 	       value == HIDEPID_INVISIBLE;
 }
 
-static int proc_parse_hidepid_param(char *value, struct pid_namespace *pid)
+static int proc_parse_hidepid_param(char *value, struct proc_fs_info *fs_info)
 {
 	unsigned int option;
 
@@ -72,16 +58,16 @@ static int proc_parse_hidepid_param(char *value, struct pid_namespace *pid)
 			return -EINVAL;
 		}
 
-		pid->hide_pid = option;
+		fs_info->hide_pid = option;
 		return 0;
 	}
 
 	if (!strcmp(value, "off"))
-		pid->hide_pid = HIDEPID_OFF;
+		fs_info->hide_pid = HIDEPID_OFF;
 	else if (!strcmp(value, "noaccess"))
-		pid->hide_pid = HIDEPID_NO_ACCESS;
+		fs_info->hide_pid = HIDEPID_NO_ACCESS;
 	else if (!strcmp(value, "invisible"))
-		pid->hide_pid = HIDEPID_INVISIBLE;
+		fs_info->hide_pid = HIDEPID_INVISIBLE;
 	else {
 		pr_err("proc: unknown value of hidepid - %s\n", value);
 		return -EINVAL;
@@ -90,7 +76,7 @@ static int proc_parse_hidepid_param(char *value, struct pid_namespace *pid)
 	return 0;
 }
 
-static int proc_parse_subset_param(char *value, struct pid_namespace *pid)
+static int proc_parse_subset_param(char *value, struct proc_fs_info *fs_info)
 {
 	if (!value)
 		return -EINVAL;
@@ -103,7 +89,7 @@ static int proc_parse_subset_param(char *value, struct pid_namespace *pid)
 
 		if (*value != '\0') {
 			if (!strcmp(value, "pid"))
-				pid->pidonly = PROC_PIDONLY_ON;
+				fs_info->pidonly = PROC_PIDONLY_ON;
 			else {
 				pr_err("proc: unsupported subset option - %s\n", value);
 				return -EINVAL;
@@ -116,7 +102,7 @@ static int proc_parse_subset_param(char *value, struct pid_namespace *pid)
 	return 0;
 }
 
-static int proc_parse_options(char *options, struct pid_namespace *pid)
+static int proc_parse_options(char *options, struct proc_fs_info *fs_info)
 {
 	char *p;
 	substring_t args[MAX_OPT_ARGS];
@@ -136,14 +122,14 @@ static int proc_parse_options(char *options, struct pid_namespace *pid)
 		case Opt_gid:
 			if (match_int(&args[0], &option))
 				return 0;
-			pid->pid_gid = make_kgid(current_user_ns(), option);
+			fs_info->pid_gid = make_kgid(current_user_ns(), option);
 			break;
 		case Opt_hidepid:
-			if (proc_parse_hidepid_param(args[0].from, pid))
+			if (proc_parse_hidepid_param(args[0].from, fs_info))
 				return 0;
 			break;
 		case Opt_subset:
-			if (proc_parse_subset_param(args[0].from, pid))
+			if (proc_parse_subset_param(args[0].from, fs_info))
 				return 0;
 			break;
 		default:
@@ -158,10 +144,10 @@ static int proc_parse_options(char *options, struct pid_namespace *pid)
 
 int proc_remount(struct super_block *sb, int *flags, char *data)
 {
-	struct pid_namespace *pid = sb->s_fs_info;
+	struct proc_fs_info *fs_info = proc_sb_info(sb);
 
 	sync_filesystem(sb);
-	return !proc_parse_options(data, pid);
+	return !proc_parse_options(data, fs_info);
 }
 
 static struct dentry *proc_mount(struct file_system_type *fs_type,
@@ -170,6 +156,7 @@ static struct dentry *proc_mount(struct file_system_type *fs_type,
 	int err;
 	struct super_block *sb;
 	struct pid_namespace *ns;
+	struct proc_fs_info *fs_info;
 	char *options;
 
 	if (flags & SB_KERNMOUNT) {
@@ -184,41 +171,56 @@ static struct dentry *proc_mount(struct file_system_type *fs_type,
 			return ERR_PTR(-EPERM);
 	}
 
-	sb = sget(fs_type, proc_test_super, proc_set_super, flags, ns);
-	if (IS_ERR(sb))
-		return ERR_CAST(sb);
+	/*
+	 * Each mount of proc is a distinct instance with its own properties
+	 * so that e.g. hidepid= is not shared between mounts in the same pid
+	 * namespace.  Allocate the per-superblock info and a fresh anonymous
+	 * superblock for every mount.
+	 */
+	fs_info = kzalloc(sizeof(*fs_info), GFP_KERNEL);
+	if (!fs_info)
+		return ERR_PTR(-ENOMEM);
 
-	if (!proc_parse_options(options, ns)) {
-		deactivate_locked_super(sb);
+	fs_info->pid_ns = get_pid_ns(ns);
+
+	if (!proc_parse_options(options, fs_info)) {
+		put_pid_ns(fs_info->pid_ns);
+		kfree(fs_info);
 		return ERR_PTR(-EINVAL);
 	}
 
-	if (!sb->s_root) {
-		err = proc_fill_super(sb);
-		if (err) {
-			deactivate_locked_super(sb);
-			return ERR_PTR(err);
-		}
-
-		sb->s_flags |= MS_ACTIVE;
-		/* User space would break if executables appear on proc */
-		sb->s_iflags |= SB_I_NOEXEC;
+	sb = sget(fs_type, NULL, set_anon_super, flags, NULL);
+	if (IS_ERR(sb)) {
+		put_pid_ns(fs_info->pid_ns);
+		kfree(fs_info);
+		return ERR_CAST(sb);
 	}
+	sb->s_fs_info = fs_info;
+
+	err = proc_fill_super(sb);
+	if (err) {
+		deactivate_locked_super(sb);
+		return ERR_PTR(err);
+	}
+
+	sb->s_flags |= MS_ACTIVE;
+	/* User space would break if executables appear on proc */
+	sb->s_iflags |= SB_I_NOEXEC;
 
 	return dget(sb->s_root);
 }
 
 static void proc_kill_sb(struct super_block *sb)
 {
-	struct pid_namespace *ns;
+	struct proc_fs_info *fs_info = proc_sb_info(sb);
 
-	ns = (struct pid_namespace *)sb->s_fs_info;
-	if (ns->proc_self)
-		dput(ns->proc_self);
-	if (ns->proc_thread_self)
-		dput(ns->proc_thread_self);
+	if (fs_info->proc_self)
+		dput(fs_info->proc_self);
+	if (fs_info->proc_thread_self)
+		dput(fs_info->proc_thread_self);
 	kill_anon_super(sb);
-	put_pid_ns(ns);
+	put_pid_ns(fs_info->pid_ns);
+	kfree(fs_info);
 }
 
 static struct file_system_type proc_fs_type = {

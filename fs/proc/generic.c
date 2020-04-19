@@ -271,9 +271,9 @@ struct dentry *proc_lookup_de(struct inode *dir, struct dentry *dentry,
 struct dentry *proc_lookup(struct inode *dir, struct dentry *dentry,
 		unsigned int flags)
 {
-	struct pid_namespace *pid = dir->i_sb->s_fs_info;
+	struct proc_fs_info *fs_info = proc_sb_info(dir->i_sb);
 
-	if (pid->pidonly == PROC_PIDONLY_ON)
+	if (fs_info->pidonly == PROC_PIDONLY_ON)
 		return ERR_PTR(-ENOENT);
 
 	return proc_lookup_de(dir, dentry, PDE(dir));
@@ -332,9 +332,9 @@ int proc_readdir_de(struct file *file, struct dir_context *ctx,
 int proc_readdir(struct file *file, struct dir_context *ctx)
 {
 	struct inode *inode = file_inode(file);
-	struct pid_namespace *pid = inode->i_sb->s_fs_info;
+	struct proc_fs_info *fs_info = proc_sb_info(inode->i_sb);
 
-	if (pid->pidonly == PROC_PIDONLY_ON)
+	if (fs_info->pidonly == PROC_PIDONLY_ON)
 		return 1;
 
 	return proc_readdir_de(file, ctx, PDE(inode));

@@ -17,18 +17,6 @@
 
 struct fs_pin;
 
-enum { /* definitions for pid_namespace's hide_pid field */
-	HIDEPID_OFF	  = 0,
-	HIDEPID_NO_ACCESS = 1,
-	HIDEPID_INVISIBLE = 2,
-};
-
-/* definitions for proc mount option pidonly */
-enum {
-	PROC_PIDONLY_OFF = 0,
-	PROC_PIDONLY_ON  = 1,
-};
-
 struct pid_namespace {
 	struct kref kref;
 	struct idr idr;
@@ -40,8 +28,6 @@ struct pid_namespace {
 	struct pid_namespace *parent;
 #ifdef CONFIG_PROC_FS
 	struct vfsmount *proc_mnt;
-	struct dentry *proc_self;
-	struct dentry *proc_thread_self;
 #endif
 #ifdef CONFIG_BSD_PROCESS_ACCT
 	struct fs_pin *bacct;
@@ -49,9 +35,6 @@ struct pid_namespace {
 	struct user_namespace *user_ns;
 	struct ucounts *ucounts;
 	struct work_struct proc_work;
-	kgid_t pid_gid;
-	int hide_pid;
-	int pidonly;
 	int reboot;	/* group exit code if this pidns was rebooted */
 	struct ns_common ns;
 } __randomize_layout;
