@@ -400,3 +400,4 @@
 433  common	fspick			sys_fspick			sys_fspick
 434  common	pidfd_open		sys_pidfd_open			sys_pidfd_open
 436  common	close_range		sys_close_range			sys_close_range
+442  common	mount_setattr		sys_mount_setattr		sys_mount_setattr

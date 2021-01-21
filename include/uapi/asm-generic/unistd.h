@@ -756,9 +756,11 @@ __SYSCALL(__NR_pidfd_open, sys_pidfd_open)
 __SYSCALL(__NR_clone3, sys_clone3)
 #define __NR_close_range 436
 __SYSCALL(__NR_close_range, sys_close_range)
+#define __NR_mount_setattr 442
+__SYSCALL(__NR_mount_setattr, sys_mount_setattr)
 
 #undef __NR_syscalls
-#define __NR_syscalls 437
+#define __NR_syscalls 443
 
 /*
  * 32 bit systems traditionally used different

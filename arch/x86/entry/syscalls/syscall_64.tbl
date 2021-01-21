@@ -353,6 +353,7 @@
 434	common	pidfd_open		__x64_sys_pidfd_open
 435	common	clone3			__x64_sys_clone3/ptregs
 436	common	close_range		__x64_sys_close_range
+442	common	mount_setattr		__x64_sys_mount_setattr
 
 #
 # x32-specific system call numbers start at 512 to avoid cache impact
