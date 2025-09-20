@@ -14,10 +14,6 @@
 #include <linux/fs.h>
 #include "connfem.h"
 
-#if (CONNFEM_TEST_ENABLED == 1)
-#include "connfem_test.h"
-#endif
-
 /*******************************************************************************
  *				M A C R O S
  ******************************************************************************/
@@ -449,10 +445,6 @@ static int connfem_plat_probe(struct platform_device *pdev)
 	pr_info("ConnFem context '%s' registered, linked to cdev", pdev->name);
 
 probe_end:
-#if (CONNFEM_TEST_ENABLED == 1)
-	connfem_test();
-#endif
-
 	return err;
 }
 
