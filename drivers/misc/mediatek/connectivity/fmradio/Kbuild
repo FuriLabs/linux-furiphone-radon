@@ -61,11 +61,12 @@ ifeq ($(CFG_FM_CHIP),)
     $(FM_CHIP)-objs += chips/mt6635/pub/mt6635_fm_rds.o
     $(FM_CHIP)-objs += chips/mt6631/pub/mt6631_fm_lib.o
     $(FM_CHIP)-objs += chips/mt6635/pub/mt6635_fm_lib.o
+    $(FM_CHIP)-objs += chips/mt6631/pub/mt6631_op_fm_lib.o
 
 else
     ifneq ($(CFG_FM_CHIP_ID),)
-	# LD 1.0
-	# CFG_FM_CHIP_ID is platform chip id
+        # LD 1.0
+        # CFG_FM_CHIP_ID is platform chip id
         ifeq ($(CONFIG_MTK_FM_CHIP),)
             $(error CONFIG_MTK_FM_CHIP not defined)
         endif
@@ -73,8 +74,8 @@ else
         ccflags-y += -D CFG_FM_CHIP_ID=0x$(CFG_FM_CHIP_ID)
         FM_CHIP := $(subst _FM,,$(subst MT,mt,$(subst ",,$(CONFIG_MTK_FM_CHIP))))
     else
-	# LD 2.0
-	# Cannot get platform chip id in LD 2.0
+        # LD 2.0
+        # Cannot get platform chip id in LD 2.0
         FM_CHIP := $(CFG_FM_CHIP)
     endif
 
@@ -108,6 +109,7 @@ else
 
     ifeq ($(FM_CHIP), mt6631)
         ccflags-y += -DMT6631_FM
+        $(FM_CHIP)-objs += chips/$(FM_CHIP_PATH)_op_fm_lib.o
     endif
 
     ifeq ($(FM_CHIP), mt6635)
@@ -121,12 +123,15 @@ else
         $(FM_CHIP)-objs += chips/$(FM_CHIP_PATH)_fm_rds.o
         $(FM_CHIP)-objs += chips/$(FM_CHIP_PATH)_fm_lib.o
     else
+        # for mt6631 support
+        ccflags-y += -I$(KO_CODE_PATH)/chips/mt6631/inc
+        $(FM_CHIP)-objs += chips/mt6631/pub/mt6631_op_fm_lib.o
+
         $(FM_CHIP)-objs += chips/mt6635/pub/mt6635_fm_rds.o
         $(FM_CHIP)-objs += chips/connac2x/pub/connac2x_fm_lib.o
         ccflags-y += -DFM_DTS_PROBE
     endif
 endif
-
 
 ccflags-y += -I$(KO_CODE_PATH)/inc \
              -I$(KO_CODE_PATH)/plat/inc
