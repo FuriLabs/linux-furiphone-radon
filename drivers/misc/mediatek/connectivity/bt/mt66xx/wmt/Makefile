@@ -8,16 +8,6 @@ ifneq ($(KERNEL_OUT),)
     ccflags-y += -imacros $(KERNEL_OUT)/include/generated/autoconf.h
 endif
 
-ifeq ($(DEVICE_MODULES_PATH),)
-DEVICE_MODULES_PATH = $(srctree)
-else
-LINUXINCLUDE := $(DEVCIE_MODULES_INCLUDE) $(LINUXINCLUDE)
-endif
-
-ifndef TOP
-    TOP := $(srctree)/..
-endif
-
 #ifneq ($(CFG_BT_PM_QOS_CONTROL),)
 #    ccflags-y += -D PM_QOS_CONTROL=1
 #else
@@ -27,7 +17,6 @@ endif
 # Force build fail on modpost warning
 KBUILD_MODPOST_FAIL_ON_WARNINGS := y
 
-$(info $(LOG_TAG) TARGET_BUILD_VARIANT = $(TARGET_BUILD_VARIANT))
 ifeq ("$(TARGET_BUILD_VARIANT)","user")
     ccflags-y += -D FW_LOG_DEFAULT_ON=0
 else
@@ -37,13 +26,10 @@ endif
 
 # platform
 ccflags-y += -D CONNAC1X_CHIPID=$(BT_PLATFORM)
-$(info $(LOG_TAG) BT_PLATFORM = $(BT_PLATFORM))
-$(info $(LOG_TAG) srctree = $(srctree), DEVICE_MODULES_PATH = $(DEVICE_MODULES_PATH))
 
 
 ###############################################################################
 # To add WMT dependent Macro and header file, will be removed later
-$(info $(LOG_TAG) BT_ENABLE_LOW_POWER_DEBUG=$(BT_ENABLE_LOW_POWER_DEBUG))
 ifeq ($(BT_ENABLE_LOW_POWER_DEBUG),y)
     ccflags-y += -D ENABLE_LOW_POWER_DEBUG=1
 else
@@ -51,8 +37,8 @@ else
 endif
 
 ccflags-y += -D MTK_WCN_WMT_STP_EXP_SYMBOL_ABSTRACT
-ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/include
-ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/include/mt-plat
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/include
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat
 #ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/mt$(BT_PLATFORM)/include
 
 ifeq ($(CONFIG_MTK_CONN_LTE_IDC_SUPPORT),y)
@@ -64,7 +50,7 @@ endif
 ###############################################################################
 # To include BT driver dependent header file
 
-WMT_SRC_FOLDER := $(TOP)/vendor/mediatek/kernel_modules/connectivity/common
+WMT_SRC_FOLDER := $(srctree)/drivers/misc/mediatek/connectivity/common
 ccflags-y += -I$(WMT_SRC_FOLDER)/common_main/include
 ccflags-y += -I$(WMT_SRC_FOLDER)/common_main/linux/include
 ifneq ($(CONFIG_MTK_CONNSYS_DEDICATED_LOG_PATH),)

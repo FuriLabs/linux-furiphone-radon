@@ -7,16 +7,6 @@
 # Compile Options
 # ---------------------------------------------------
 
-ifeq ($(DEVICE_MODULES_PATH),)
-DEVICE_MODULES_PATH = $(srctree)
-else
-LINUXINCLUDE := $(DEVCIE_MODULES_INCLUDE) $(LINUXINCLUDE)
-endif
-
-ifndef TOP
-    TOP := $(srctree)/..
-endif
-
 ifneq ($(KERNEL_OUT),)
     ccflags-y += -imacros $(KERNEL_OUT)/include/generated/autoconf.h
 endif
@@ -24,29 +14,10 @@ endif
 # Force build fail on modpost warning
 KBUILD_MODPOST_FAIL_ON_WARNINGS := y
 
-# platform
-
-ifeq ($(CONFIG_WLAN_DRV_BUILD_IN),y)
-  $(info build-in mode!)
-  $(info _MTK_BT_CHIP = $(_MTK_BT_CHIP))
-  # _MTK_BT_CHIP comes from conninfra setting
-  BT_PLATFORM = $(patsubst MTK_CONSYS_MT%,%,$(strip $(_MTK_BT_CHIP)))
-endif
-
-
-$(info $(LOG_TAG) TARGET_BUILD_VARIANT = $(TARGET_BUILD_VARIANT))
-ifeq ("$(TARGET_BUILD_VARIANT)","user")
-    ccflags-y += -D FW_LOG_DEFAULT_ON=0
-    ccflags-y += -D BUILD_QA_DBG=0
-else
-    ccflags-y += -D FW_LOG_DEFAULT_ON=1
-    ccflags-y += -D BUILD_QA_DBG=1
-endif
-
+ccflags-y += -D FW_LOG_DEFAULT_ON=0
+ccflags-y += -D BUILD_QA_DBG=0
 
 ccflags-y += -D CONNAC20_CHIPID=$(BT_PLATFORM)
-$(info $(LOG_TAG) BT_PLATFORM = $(BT_PLATFORM))
-$(info $(LOG_TAG) srctree = $(srctree), DEVICE_MODULES_PATH = $(DEVICE_MODULES_PATH))
 
 # ---------------------------------------------------
 # Compile Options: set feature flag (1: enable, 0: disable)
@@ -73,14 +44,14 @@ ccflags-y += -D CONFIG_MP_WAKEUP_SOURCE_SYSFS_STAT=1
 # ---------------------------------------------------
 # Include Path
 # ---------------------------------------------------
-CONN_INFRA_SRC := $(TOP)/vendor/mediatek/kernel_modules/connectivity/conninfra
-CONNFEM_SRC := $(TOP)/vendor/mediatek/kernel_modules/connectivity/connfem
-WMT_SRC := $(TOP)/vendor/mediatek/kernel_modules/connectivity/common
-BTIF_SRC := $(DEVICE_MODULES_PATH)/drivers/misc/mediatek/btif
-ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/connectivity/common
-ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/include/mt-plat/
-ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/misc/mediatek/connectivity/power_throttling
-ccflags-y += -I$(DEVICE_MODULES_PATH)/drivers/gpu/drm/mediatek/mediatek_v2/
+CONN_INFRA_SRC := $(srctree)/drivers/misc/mediatek/connectivity/conninfra
+CONNFEM_SRC := $(srctree)/drivers/misc/mediatek/connectivity/connfem
+WMT_SRC := $(srctree)/drivers/misc/mediatek/connectivity/common
+BTIF_SRC := $(srctree)/drivers/misc/mediatek/btif
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/common
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/include/mt-plat/
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/connectivity/power_throttling
+ccflags-y += -I$(srctree)/drivers/gpu/drm/mediatek/mediatek_v2/
 ccflags-y += -I$(CONN_INFRA_SRC)/include
 ccflags-y += -I$(CONN_INFRA_SRC)/debug_utility/include
 ccflags-y += -I$(CONN_INFRA_SRC)/debug_utility/metlog
