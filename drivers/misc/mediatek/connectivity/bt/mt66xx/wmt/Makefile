@@ -23,10 +23,8 @@ else
     ccflags-y += -D FW_LOG_DEFAULT_ON=1
 endif
 
-
 # platform
 ccflags-y += -D CONNAC1X_CHIPID=$(BT_PLATFORM)
-
 
 ###############################################################################
 # To add WMT dependent Macro and header file, will be removed later
