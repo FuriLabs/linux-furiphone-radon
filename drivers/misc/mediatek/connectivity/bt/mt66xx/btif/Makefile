@@ -74,11 +74,11 @@ ccflags-y += -I$(src)/../include/btif
 # Objects List
 # ---------------------------------------------------
 MODULE_NAME := bt_drv_$(BT_PLATFORM)
-ifeq ($(CONFIG_WLAN_DRV_BUILD_IN),y)
-  obj-y += $(MODULE_NAME).o
-else
+#ifeq ($(CONFIG_WLAN_DRV_BUILD_IN),y)
+#  obj-y += $(MODULE_NAME).o
+#else
   obj-m += $(MODULE_NAME).o
-endif
+#endif
 
 CORE_OBJS := btmtk_dbg.o btmtk_dbg_tp_evt_if.o btmtk_irq.o btmtk_char_dev.o ../btmtk_fw_log.o ../btmtk_main.o
 CHIP_OBJS := btmtk_mt66xx.o
