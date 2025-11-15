@@ -4562,8 +4562,9 @@ static int __init battery_probe(struct platform_device *dev)
 		IS_ENABLED(CONFIG_MTK_DISABLE_GAUGE)) {
 		bm_debug("disable GM 3.0\n");
 		disable_fg();
-	} else if (is_recovery_mode())
+	} else {
 		battery_recovery_init();
+	}
 
 	mtk_battery_last_init(dev);
 
