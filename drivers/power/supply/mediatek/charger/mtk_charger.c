@@ -1699,13 +1699,23 @@ static void mtk_chg_get_tchg(struct charger_manager *info)
 	}
 }
 
+/* TODO: move this to a common helper source file */
+extern bool is_kernel_power_off_charging(void);
+
 static void charger_check_status(struct charger_manager *info)
 {
 	bool charging = true;
 	int temperature = 0;
 	struct battery_thermal_protection_data *thermal = NULL;
+	bool kpoc = is_kernel_power_off_charging();
 
-	if (mt_get_charger_type() == CHARGER_UNKNOWN)
+	/*
+	 * In normal boots, if the charger type is UNKNOWN we skip charging
+	 * logic entirely. In KPOC, though, the charger type may not be set
+	 * up properly while VBUS is actually present, so we still want the
+	 * charging logic to run there.
+	 */
+	if (mt_get_charger_type() == CHARGER_UNKNOWN && !kpoc)
 		return;
 
 	temperature = info->battery_temp;
@@ -4094,9 +4104,7 @@ static int mtk_charger_probe(struct platform_device *pdev)
 	info->chg1_consumer =
 		charger_manager_get_by_name(&pdev->dev, "charger_port1");
 
-	if (info->chg1_consumer != NULL &&
-	    boot_mode != KERNEL_POWER_OFF_CHARGING_BOOT &&
-	    boot_mode != LOW_POWER_OFF_CHARGING_BOOT)
+	if (info->chg1_consumer != NULL)
 		charger_manager_force_disable_power_path(
 			info->chg1_consumer, MAIN_CHARGER, true);
 
