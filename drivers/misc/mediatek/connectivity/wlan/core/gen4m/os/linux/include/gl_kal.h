@@ -97,8 +97,11 @@
 #endif
 
 #if CFG_SUPPORT_SCAN_CACHE_RESULT
-#include "wireless/core.h"
+#include <../net/wireless/core.h>
 #endif
+
+/* for sched_clock() */
+#include <linux/sched/clock.h>
 
 #if DBG
 extern int allocatedMemSize;
@@ -140,7 +143,7 @@ extern bool fgIsTxPowerDecreased;
 	(GLUE_FLAG_HALT | GLUE_FLAG_SUB_MOD_MULTICAST | \
 	GLUE_FLAG_TX_CMD_DONE | GLUE_FLAG_TXREQ | GLUE_FLAG_TIMEOUT | \
 	GLUE_FLAG_FRAME_FILTER | GLUE_FLAG_OID | GLUE_FLAG_RX | \
-	GLUE_FLAG_SER_TIMEOUT)
+	GLUE_FLAG_SER_TIMEOUT | GLUE_FLAG_DISABLE_PERF)
 
 #define GLUE_FLAG_HIF_PROCESS \
 	(GLUE_FLAG_HALT | GLUE_FLAG_INT | GLUE_FLAG_HIF_TX | \
@@ -714,6 +717,14 @@ static inline void kalCfg80211ScanDone(struct cfg80211_scan_request *request,
 })
 #endif
 
+#define kalMemZAlloc(u4Size, eMemType) ({    \
+	void *pvAddr; \
+	pvAddr = kalMemAlloc(u4Size, eMemType); \
+	if (pvAddr) \
+		kalMemSet(pvAddr, 0, u4Size); \
+	pvAddr; \
+})
+
 /*----------------------------------------------------------------------------*/
 /*!
  * \brief Free allocated cache memory
@@ -917,7 +928,6 @@ int8_t atoi(uint8_t ch);
 
 #define kalGetTimeTick()                jiffies_to_msecs(jiffies)
 
-#if (BUILD_QA_DBG == 1)
 #define kalPrintLogLimited(fmt, ...)					\
 ({									\
 	static DEFINE_RATELIMIT_STATE(_rs,				\
@@ -930,10 +940,6 @@ int8_t atoi(uint8_t ch);
 #define WLAN_TAG                        "[wlan]"
 #define kalPrint               kalPrintLog
 #define kalPrintLimited(_Fmt...) kalPrintLogLimited(WLAN_TAG _Fmt)
-#else
-#define kalPrintLimited(fmt, ...)
-#define kalPrint(fmt, ...)
-#endif
 
 #define kalBreakPoint() \
 do { \
@@ -1833,9 +1839,7 @@ void kalUpdateCompHdlrRec(IN struct ADAPTER *prAdapter,
 	IN PFN_OID_HANDLER_FUNC pfnOidHandler, IN struct CMD_INFO *prCmdInfo);
 
 extern uint32_t get_wifi_standalone_log_mode(void);
-#if (BUILD_QA_DBG == 1)
 void kalPrintLog(const char *fmt, ...);
-#endif
 
 #if (CFG_SUPPORT_POWER_THROTTLING == 1)
 void kalPwrLevelHdlrRegister(IN struct ADAPTER *prAdapter,
@@ -1846,6 +1850,21 @@ void connsysPowerTempNotify(IN struct ADAPTER *prAdapter);
 void connsysPowerTempUpdate(enum conn_pwr_msg_type status,
 					int currentTemp);
 uint32_t kalDumpPwrLevel(IN struct ADAPTER *prAdapter);
+#endif
+
+#ifndef __has_attribute
+#define __has_attribute(x) 0
+#endif
+
+#if !defined(__GCC4_has_attribute___fallthrough__)
+#define __GCC4_has_attribute___fallthrough__ 0
+#endif
+
+/* clone 'fallthrough' in include/linux/compiler_attributes.h */
+#if __has_attribute(__fallthrough__)
+#define kal_fallthrough __attribute__((__fallthrough__))
+#else
+#define kal_fallthrough do {} while (0)  /* fallthrough */
 #endif
 
 #endif /* _GL_KAL_H */

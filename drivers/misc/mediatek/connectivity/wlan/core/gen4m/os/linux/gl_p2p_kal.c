@@ -214,7 +214,8 @@ kalP2PUpdateAssocInfo(IN struct GLUE_INFO *prGlueInfo,
 	wrqu.data.length = pucDesiredIE[1] + 2;
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prGlueInfo->prAdapter, ucBssIndex);
-
+	if (!prBssInfo)
+		return;
 	if (ucBssIndex == prGlueInfo->prAdapter->ucP2PDevBssIdx)
 		prNetdevice = prGlueInfo->prP2PInfo
 			[prBssInfo->u4PrivateData]->prDevHandler;
@@ -1367,6 +1368,9 @@ void kalP2PIndicateMgmtTxStatus(IN struct GLUE_INFO *prGlueInfo,
 				GET_BSS_INFO_BY_INDEX(prGlueInfo->prAdapter,
 				prMsduInfo->ucBssIndex);
 
+			if (prP2pBssInfo == NULL)
+				return;
+
 			prGlueP2pInfo =
 				prGlueInfo->prP2PInfo
 					[prP2pBssInfo->u4PrivateData];
@@ -2293,6 +2297,7 @@ void kalP2pIndicateAcsResult(IN struct GLUE_INFO *prGlueInfo,
 			ch_width = 20;
 			ucSecondCh = 0;
 		}
+#if CFG_SUPPORT_SAP_DFS_CHANNEL
 		wlanUpdateDfsChannelTable(prGlueInfo,
 			ucRoleIndex,
 			ucPrimaryCh,
@@ -2300,6 +2305,7 @@ void kalP2pIndicateAcsResult(IN struct GLUE_INFO *prGlueInfo,
 			0,
 			nicChannelNum2Freq(ucSeg0Ch, eBand) / 1000,
 			eBand);
+#endif
 	}
 
 	DBGLOG(P2P, INFO,
@@ -2464,6 +2470,7 @@ void kalP2pIndicateChnlSwitch(IN struct ADAPTER *prAdapter,
 	struct GL_P2P_INFO *prP2PInfo;
 	struct net_device *prNetdevice = (struct net_device *) NULL;
 	uint8_t role_idx = 0;
+	uint8_t linkIdx;
 
 	if (!prAdapter || !prBssInfo)
 		return;
@@ -2613,8 +2620,14 @@ void kalP2pIndicateChnlSwitch(IN struct ADAPTER *prAdapter,
 			prP2PInfo->chandefCsa.chan->dfs_state);
 	}
 
-	/* Ch notify */
-	cfg80211_ch_switch_notify(
-		prNetdevice,
-		&prP2PInfo->chandefCsa);
+	linkIdx = 0;
+#if (KERNEL_VERSION(6, 3, 0) <= CFG80211_VERSION_CODE)
+	cfg80211_ch_switch_notify(prNetdevice, &prP2PInfo->chandefCsa,
+		linkIdx, 0);
+#elif (KERNEL_VERSION(5, 19, 2) <= CFG80211_VERSION_CODE)
+	cfg80211_ch_switch_notify(prNetdevice, &prP2PInfo->chandefCsa,
+		linkIdx);
+#else
+	cfg80211_ch_switch_notify(prNetdevice, &prP2PInfo->chandefCsa);
+#endif
 }

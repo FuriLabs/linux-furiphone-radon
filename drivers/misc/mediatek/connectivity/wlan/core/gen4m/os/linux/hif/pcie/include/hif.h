@@ -196,7 +196,7 @@ struct BUS_INFO {
 	const uint32_t tx_ring_wa_cmd_idx;
 	const uint32_t tx_ring_fwdl_idx;
 	const uint32_t tx_ring0_data_idx;
-	const uint32_t tx_ring1_data_idx;
+	uint32_t tx_ring1_data_idx;
 	const uint32_t tx_ring2_data_idx;
 #if CFG_TRI_TX_RING
 	const uint32_t tx_ring3_data_idx;
@@ -315,6 +315,7 @@ struct BUS_INFO {
 	void (*enableTxDataRingPrefetch)(
 		struct GLUE_INFO *prGlueInfo, uint32_t u4Port);
 	void (*resetTxDataRingPrefetch)(struct GLUE_INFO *prGlueInfo);
+	void (*clearEvtRingTillCmdRingEmpty)(struct ADAPTER *prAdapter);
 
 	struct SW_WFDMA_INFO rSwWfdmaInfo;
 };

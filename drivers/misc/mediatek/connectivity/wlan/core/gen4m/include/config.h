@@ -254,7 +254,7 @@
 
 /* Enable Android wake_lock operations */
 #ifndef CFG_ENABLE_WAKE_LOCK
-#define CFG_ENABLE_WAKE_LOCK	0
+#define CFG_ENABLE_WAKE_LOCK	1
 #endif
 
 #define CFG_SUPPORT_OSHARE	1
@@ -579,9 +579,6 @@
 /*! Maximum size of Header buffer of each SCAN record */
 #define CFG_RAW_BUFFER_SIZE                      1024
 
-/*! Maximum size of IE buffer of each SCAN record */
-#define CFG_IE_BUFFER_SIZE                      512
-
 /*------------------------------------------------------------------------------
  * Flags and Parameters for Power management
  *------------------------------------------------------------------------------
@@ -623,12 +620,12 @@
 
 #if (CFG_SUPPORT_WIFI_6G == 1)
 #define MAX_2G_BAND_CHN_NUM		14
-#define MAX_5G_BAND_CHN_NUM		25
-#define MAX_6G_BAND_CHN_NUM		59 /* will be 59 for full channel set */
-#define MAX_PER_BAND_CHN_NUM		59
+#define MAX_5G_BAND_CHN_NUM		28
+#define MAX_6G_BAND_CHN_NUM		60 /* will be 60 for full channel set */
+#define MAX_PER_BAND_CHN_NUM		60
 #else
 #define MAX_2G_BAND_CHN_NUM		14
-#define MAX_5G_BAND_CHN_NUM		25
+#define MAX_5G_BAND_CHN_NUM		28
 #define MAX_6G_BAND_CHN_NUM		0
 #define MAX_PER_BAND_CHN_NUM		25
 #endif
@@ -755,10 +752,6 @@
 /* Allow setting max P2P GO client count */
 #ifndef CFG_P2P_DEFAULT_CLIENT_COUNT
 #define CFG_P2P_DEFAULT_CLIENT_COUNT 0
-#endif
-
-#ifndef CFG_P2P_FORCE_ROC_CSA
-#define CFG_P2P_FORCE_ROC_CSA 1
 #endif
 
 /*------------------------------------------------------------------------------
@@ -1678,6 +1671,12 @@
 #define CFG_SUPPORT_ANDROID_DUAL_STA 0
 
 #define CFG_SUPPORT_LIMITED_PKT_PID  1
+
+#ifdef CFG_MLD_LINK_MAX
+#define MLD_LINK_MAX (CFG_MLD_LINK_MAX)
+#else
+#define MLD_LINK_MAX 1
+#endif
 
 /*******************************************************************************
  *                             D A T A   T Y P E S

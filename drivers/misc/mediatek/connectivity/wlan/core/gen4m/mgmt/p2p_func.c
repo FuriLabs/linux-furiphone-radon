@@ -72,6 +72,8 @@ struct APPEND_VAR_IE_ENTRY txProbeRspIETable[] = {
 			rlmRspGenerateHtCapIE}	/* 45 */
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_HT_OP), NULL,
 			rlmRspGenerateHtOpIE}	/* 61 */
+	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_TPE), NULL,
+			rlmGenerateHtTPEIE}	/* 34 */
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_RSN), NULL,
 			rsnGenerateRSNIE}	/* 48 */
 	, {(ELEM_HDR_LEN + ELEM_MAX_LEN_OBSS_SCAN), NULL,
@@ -301,7 +303,7 @@ void p2pFuncRequestScan(IN struct ADAPTER *prAdapter,
 				prScanReqV2->ucChannelListNum =
 					prScanReqInfo->ucNumChannelList;
 			}
-			/* fallthrough */
+			kal_fallthrough;
 		case SCAN_CHANNEL_FULL:
 			/* fallthrough */
 		case SCAN_CHANNEL_2G4:
@@ -1168,7 +1170,8 @@ p2pFuncTxMgmtFrame(IN struct ADAPTER *prAdapter,
 			DBGLOG(P2P, TRACE, "TX Probe Resposne Frame\n");
 			prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter,
 				ucBssIndex);
-			if ((!nicTxIsMgmtResourceEnough(prAdapter))
+			if (!prBssInfo ||
+				(!nicTxIsMgmtResourceEnough(prAdapter))
 				|| (prBssInfo->fgIsNetAbsent)) {
 				DBGLOG(P2P, INFO,
 					"Drop Tx probe response due to resource issue\n");
@@ -1722,7 +1725,7 @@ p2pFuncSwitchOPMode(IN struct ADAPTER *prAdapter,
 			case OP_MODE_INFRASTRUCTURE:
 				DBGLOG(P2P, TRACE,
 					"p2pFuncSwitchOPMode: Switch to Client.\n");
-				/* fall through */
+				kal_fallthrough;
 			case OP_MODE_ACCESS_POINT:
 				/* Change interface address. */
 				if (eOpMode == OP_MODE_ACCESS_POINT) {
@@ -1952,6 +1955,7 @@ void p2pFuncAcquireCh(IN struct ADAPTER *prAdapter,
 void p2pFuncSetDfsChannelAvailable(IN struct ADAPTER *prAdapter,
 		IN uint8_t ucChannel, IN uint8_t ucAvailable)
 {
+#if CFG_SUPPORT_SAP_DFS_CHANNEL
 	DBGLOG(P2P, INFO,
 		"p2pFuncSetDfsChannelAvailable: channel %d %s\n", ucChannel,
 		ucAvailable == 1 ? "available" : "unavailable");
@@ -1963,6 +1967,11 @@ void p2pFuncSetDfsChannelAvailable(IN struct ADAPTER *prAdapter,
 		0, /* sco */
 		0, /* center frequency */
 		0 /* eBand */);
+#else
+
+	DBGLOG(P2P, INFO, "SAP DFS channel not support");
+
+#endif
 }
 
 void p2pFuncStartRdd(IN struct ADAPTER *prAdapter, IN uint8_t ucBssIdx)
@@ -2684,8 +2693,9 @@ p2pFuncBeaconUpdate(IN struct ADAPTER *prAdapter,
 			(uint8_t *) prBcnFrame->aucInfoElem,
 			(prBcnMsduInfo->u2FrameLength -
 			OFFSET_OF(struct WLAN_BEACON_FRAME, aucInfoElem)));
-
-		p2pFuncParseH2E(prP2pBssInfo);
+		if (prP2pBssInfo->ucAllSupportedRatesLen <=
+			RATE_NUM_SW)
+			p2pFuncParseH2E(prP2pBssInfo);
 
 #if 1
 		/* bssUpdateBeaconContent(prAdapter, NETWORK_TYPE_P2P_INDEX); */
@@ -2722,9 +2732,18 @@ p2pFuncAssocRespUpdate(IN struct ADAPTER *prAdapter,
 		    IN struct BSS_INFO *prP2pBssInfo,
 		    IN uint8_t *AssocRespIE, IN uint32_t u4AssocRespLen)
 {
-	kalP2PUpdateWSC_IE(prAdapter->prGlueInfo, 3,
-		(uint8_t *)AssocRespIE, IE_SIZE(AssocRespIE),
-		(uint8_t) (prP2pBssInfo->u4PrivateData));
+	uint8_t ucOuiType = 0;
+	uint16_t u2SubTypeVersion = 0;
+
+	if (!rsnParseCheckForWFAInfoElem(prAdapter,
+		AssocRespIE, &ucOuiType, &u2SubTypeVersion))
+		return WLAN_STATUS_FAILURE;
+
+	if (ucOuiType == VENDOR_OUI_TYPE_WPS) {
+		kalP2PUpdateWSC_IE(prAdapter->prGlueInfo, 3,
+			(uint8_t *)AssocRespIE, IE_SIZE(AssocRespIE),
+			(uint8_t) (prP2pBssInfo->u4PrivateData));
+	}
 
 	return WLAN_STATUS_SUCCESS;
 }
@@ -3154,6 +3173,7 @@ p2pFuncDisconnect(IN struct ADAPTER *prAdapter,
 
 #if (CFG_SUPPORT_DFS_MASTER == 1)
 			if (!aisGetConnectedBssInfo(prAdapter)) {
+#if CFG_SUPPORT_SAP_DFS_CHANNEL
 				/* restore DFS channels table */
 				wlanUpdateDfsChannelTable(prAdapter->prGlueInfo,
 					-1, /* p2p role index */
@@ -3162,6 +3182,7 @@ p2pFuncDisconnect(IN struct ADAPTER *prAdapter,
 					0, /* sco */
 					0, /* center frequency */
 					0 /* eBand */);
+#endif
 			}
 #endif
 		} else {
@@ -3463,6 +3484,8 @@ struct BSS_INFO *p2pFuncBSSIDFindBssInfo(IN struct ADAPTER *prAdapter,
 				continue;
 
 			prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIdx);
+			if (!prBssInfo)
+				break;
 
 			if (EQUAL_MAC_ADDR(prBssInfo->aucBSSID, pucBSSID)
 				&& IS_BSS_P2P(prBssInfo))
@@ -4070,7 +4093,7 @@ void p2pFuncValidateRxActionFrame(IN struct ADAPTER *prAdapter,
 				return;
 			}
 		}
-		/* Fall through */
+		kal_fallthrough;
 	default:
 		break;
 	}
@@ -4427,6 +4450,13 @@ p2pFuncParseBeaconContent(IN struct ADAPTER *prAdapter,
 					== RSN_AKM_SUITE_802_1X_SHA256)) {
 						DBGLOG(RSN, INFO,
 							"SHA256 support\n");
+						/* over-write
+						 * u4RsnSelectedAKMSuite
+						 * by SHA256 AKM
+						 */
+						prP2pBssInfo
+						->u4RsnSelectedAKMSuite
+						= rRsnIe.au4AuthKeyMgtSuite[i];
 						prP2pBssInfo
 						->rApPmfCfg.fgSha256
 						= TRUE;
@@ -5208,7 +5238,8 @@ struct MSDU_INFO *p2pFuncProcessP2pProbeRsp(IN struct ADAPTER *prAdapter,
 		ASSERT_BREAK((prAdapter != NULL) && (prMgmtTxMsdu != NULL));
 
 		prP2pBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIdx);
-
+		if (!prP2pBssInfo)
+			break;
 		/* 3 Make sure this is probe response frame. */
 		prProbeRspFrame = (struct WLAN_BEACON_FRAME *)
 			((unsigned long) prMgmtTxMsdu->prPacket +
@@ -5491,6 +5522,8 @@ p2pFuncProcessP2pProbeRspAction(IN struct ADAPTER *prAdapter,
 	 * p2p bss index unexpectedly.
 	*/
 	uint8_t ucP2pStartIdx = KAL_AIS_NUM;
+	if (!prP2pBssInfo)
+		return;
 
 	switch (ucElemIdType) {
 	case ELEM_ID_SSID:
@@ -5521,6 +5554,8 @@ p2pFuncProcessP2pProbeRspAction(IN struct ADAPTER *prAdapter,
 					GET_BSS_INFO_BY_INDEX(
 						prAdapter,
 						prAdapter->ucP2PDevBssIdx);
+				if (!(*prP2pBssInfo))
+					break;
 				COPY_SSID(
 					(*prP2pBssInfo)->aucSSID,
 					(*prP2pBssInfo)->ucSSIDLen,
@@ -5758,7 +5793,8 @@ uint32_t p2pFuncCalculateWSC_IELenForBeacon(IN struct ADAPTER *prAdapter,
 
 	prP2pBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIdx);
 
-	if (prP2pBssInfo->eNetworkType != NETWORK_TYPE_P2P)
+	if (!prP2pBssInfo ||
+		prP2pBssInfo->eNetworkType != NETWORK_TYPE_P2P)
 		return 0;
 
 	return kalP2PCalWSC_IELen(prAdapter->prGlueInfo,
@@ -5777,7 +5813,8 @@ void p2pFuncGenerateWSC_IEForBeacon(IN struct ADAPTER *prAdapter,
 
 	prP2pBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prMsduInfo->ucBssIndex);
 
-	if (prP2pBssInfo->eNetworkType != NETWORK_TYPE_P2P)
+	if (!prP2pBssInfo ||
+		prP2pBssInfo->eNetworkType != NETWORK_TYPE_P2P)
 		return;
 
 	u2IELen = (uint16_t) kalP2PCalWSC_IELen(prAdapter->prGlueInfo,
@@ -5813,7 +5850,8 @@ uint32_t p2pFuncCalculateP2p_IELenForAssocRsp(IN struct ADAPTER *prAdapter,
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
 
-	if (prBssInfo->eNetworkType != NETWORK_TYPE_P2P)
+	if (!prBssInfo ||
+		prBssInfo->eNetworkType != NETWORK_TYPE_P2P)
 		return 0;
 
 	return p2pFuncCalculateP2P_IELen(prAdapter,
@@ -6434,7 +6472,8 @@ uint32_t wfdFuncCalculateWfdIELenForAssocRsp(IN struct ADAPTER *prAdapter,
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
 
-	if (prBssInfo->eNetworkType != NETWORK_TYPE_P2P)
+	if (!prBssInfo ||
+		prBssInfo->eNetworkType != NETWORK_TYPE_P2P)
 		return 0;
 
 	if (!IS_STA_P2P_TYPE(prStaRec))
@@ -6514,6 +6553,8 @@ p2pFuncComposeNoaAttribute(IN struct ADAPTER *prAdapter,
 	uint32_t i = 0;
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
+	if (!prBssInfo)
+		return;
 	prP2pSpecificBssInfo =
 		prAdapter->rWifiVar
 			.prP2pSpecificBssInfo[prBssInfo->u4PrivateData];
@@ -6601,7 +6642,7 @@ void p2pFuncGenerateP2P_IE_NoA(IN struct ADAPTER *prAdapter,
 {
 	struct IE_P2P *prIeP2P;
 	uint8_t aucWfaOui[] = VENDOR_OUI_WFA_SPECIFIC;
-	uint32_t u4AttributeLen;
+	uint32_t u4AttributeLen = 0;
 	struct BSS_INFO *prBssInfo;
 
 	prBssInfo = prAdapter->aprBssInfo[prMsduInfo->ucBssIndex];
@@ -7919,6 +7960,9 @@ p2pFunDetermineChnlSwitchPolicy(IN struct ADAPTER *prAdapter,
 		return ePolicy;
 	}
 
+	if (IS_FEATURE_DISABLED(prAdapter->rWifiVar.ucCsaDeauthClient))
+		return ePolicy;
+
 #if CFG_SEND_DEAUTH_DURING_CHNL_SWITCH
 	/* Send deauth frame to clients:
 	 * 1. Cross band
@@ -7948,6 +7992,8 @@ p2pFunNotifyChnlSwitch(IN struct ADAPTER *prAdapter,
 	DBGLOG(P2P, INFO, "bss index: %d, policy: %d\n", ucBssIdx, ePolicy);
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIdx);
+	if (!prBssInfo)
+		return;
 	prClientList = &prBssInfo->rStaRecOfClientList;
 
 	switch (ePolicy) {

@@ -957,7 +957,7 @@ struct QUE *qmDetermineStaTxQueue(IN struct ADAPTER *prAdapter,
 	struct STA_RECORD *prStaRec;
 	enum ENUM_WMM_ACI eAci = WMM_AC_BE_INDEX;
 	u_int8_t fgCheckACMAgain;
-	uint8_t ucTC, ucQueIdx = TX_QUEUE_INDEX_AC0;
+	uint8_t ucTC = 0, ucQueIdx = TX_QUEUE_INDEX_AC0;
 	struct BSS_INFO *prBssInfo;
 	/* BEtoBK, na, VItoBE, VOtoVI */
 	uint8_t aucNextUP[WMM_AC_INDEX_NUM] = {1, 1, 0, 4};
@@ -984,10 +984,11 @@ struct QUE *qmDetermineStaTxQueue(IN struct ADAPTER *prAdapter,
 		if (prStaRec->fgIsQoS) {
 			if (prMsduInfo->ucUserPriority < TX_DESC_TID_NUM) {
 				eAci = aucTid2ACI[prMsduInfo->ucUserPriority];
-				ucQueIdx = aucACI2TxQIdx[eAci];
-				ucTC =
-					arNetwork2TcResource[
-					prMsduInfo->ucBssIndex][eAci];
+				if (eAci < WMM_AC_INDEX_NUM) {
+					ucQueIdx = aucACI2TxQIdx[eAci];
+					ucTC = arNetwork2TcResource[
+						prMsduInfo->ucBssIndex][eAci];
+				}
 			} else {
 				ucQueIdx = TX_QUEUE_INDEX_AC1;
 				ucTC = TC1_INDEX;
@@ -996,7 +997,8 @@ struct QUE *qmDetermineStaTxQueue(IN struct ADAPTER *prAdapter,
 					"Packet TID is not in [0~7]\n");
 				ASSERT(0);
 			}
-			if ((prBssInfo->arACQueParms[eAci].ucIsACMSet) &&
+			if (eAci < WMM_AC_INDEX_NUM &&
+				(prBssInfo->arACQueParms[eAci].ucIsACMSet) &&
 			    !(ucActiveTs & BIT(eAci)) &&
 			    (eAci != WMM_AC_BK_INDEX)) {
 				DBGLOG(WMM, TRACE,
@@ -1320,9 +1322,12 @@ struct MSDU_INFO *qmEnqueueTxPackets(IN struct ADAPTER *prAdapter,
 		}
 #if QM_TC_RESOURCE_EMPTY_COUNTER
 		if (prCurrentMsduInfo->u4PageCount >
-			prTxCtrl->rTc.au4FreePageCount[ucTC])
-			prQM->au4QmTcResourceEmptyCounter[
-			prCurrentMsduInfo->ucBssIndex][ucTC]++;
+			prTxCtrl->rTc.au4FreePageCount[ucTC]) {
+			if (prCurrentMsduInfo->ucBssIndex < MAX_BSSID_NUM
+				&& ucTC < TC_NUM)
+				prQM->au4QmTcResourceEmptyCounter[
+				prCurrentMsduInfo->ucBssIndex][ucTC]++;
+		}
 #endif
 
 #if QM_FAST_TC_RESOURCE_CTRL && QM_ADAPTIVE_TC_RESOURCE_CTRL
@@ -1376,6 +1381,11 @@ void qmDetermineStaRecIndex(IN struct ADAPTER *prAdapter,
 	prTempStaRec = NULL;
 
 	ASSERT(prMsduInfo);
+
+	if (prBssInfo == NULL) {
+		DBGLOG(QM, INFO, "TX with prBssInfo = NULL\n");
+		return;
+	}
 
 	DBGLOG(QM, LOUD,
 		"Msdu BSS Idx[%u] OpMode[%u] StaRecOfApExist[%u]\n",
@@ -1624,7 +1634,8 @@ qmDequeueTxPacketsFromPerStaQueues(IN struct ADAPTER *prAdapter,
 #if CFG_SUPPORT_NAN
 #if CFG_SUPPORT_NAN_ADVANCE_DATA_CONTROL
 			fgIsNanStaRec = FALSE;
-			if (prBssInfo->eNetworkType == NETWORK_TYPE_NAN) {
+			if (prBssInfo &&
+				prBssInfo->eNetworkType == NETWORK_TYPE_NAN) {
 				fgIsNanStaRec = TRUE;
 				DBGLOG(NAN, TEMP, "NAN STA:%d, TC:%d\n",
 				       prStaRec->ucIndex, ucTC);
@@ -1634,14 +1645,14 @@ qmDequeueTxPacketsFromPerStaQueues(IN struct ADAPTER *prAdapter,
 
 			/* fgIsInPS */
 			/* Absent BSS handling */
-			if (prBssInfo->fgIsNetAbsent) {
+			if (prBssInfo && prBssInfo->fgIsNetAbsent) {
 				if (u4MaxForwardFrameCountLimit >
 					prBssInfo->ucBssFreeQuota)
 					u4MaxForwardFrameCountLimit =
 						prBssInfo->ucBssFreeQuota;
 			}
 #if CFG_SUPPORT_DBDC
-			if (prAdapter->rWifiVar.fgDbDcModeEn)
+			if (prBssInfo && prAdapter->rWifiVar.fgDbDcModeEn)
 				u4MaxResourceLimit =
 					gmGetDequeueQuota(prAdapter,
 						prStaRec, prBssInfo,
@@ -1656,9 +1667,9 @@ qmDequeueTxPacketsFromPerStaQueues(IN struct ADAPTER *prAdapter,
 				/* Quick check remain medium time and pending
 				** packets
 				*/
-				if (QUEUE_IS_EMPTY(prCurrQueue) ||
+				if (prBssInfo && (QUEUE_IS_EMPTY(prCurrQueue) ||
 				    !wmmAcmCanDequeue(prAdapter, ucAc, 0,
-				    prBssInfo->ucBssIndex))
+				    prBssInfo->ucBssIndex)))
 					goto skip_dequeue;
 				fgAcmFlowCtrl = TRUE;
 			} else
@@ -1747,8 +1758,9 @@ qmDequeueTxPacketsFromPerStaQueues(IN struct ADAPTER *prAdapter,
 						prBssInfo, prStaRec,
 						prDequeuedPkt->u2FrameLength -
 							ETH_HLEN);
-					if (!wmmAcmCanDequeue(prAdapter, ucAc,
-						u4PktTxTime,
+					if (prBssInfo &&
+						!wmmAcmCanDequeue(prAdapter,
+						ucAc, u4PktTxTime,
 						prBssInfo->ucBssIndex))
 						break;
 				}
@@ -1773,8 +1785,9 @@ qmDequeueTxPacketsFromPerStaQueues(IN struct ADAPTER *prAdapter,
 				}
 
 				/* to record WMM Set */
-				prDequeuedPkt->ucWmmQueSet =
-					prBssInfo->ucWmmQueSet;
+				if (prBssInfo)
+					prDequeuedPkt->ucWmmQueSet =
+						prBssInfo->ucWmmQueSet;
 				QUEUE_INSERT_TAIL(prQue,
 					(struct QUE_ENTRY *)
 					prDequeuedPkt);
@@ -1802,7 +1815,7 @@ skip_dequeue:
 					(*pucPsStaFreeQuota) = 0;
 			}
 
-			if (prBssInfo->fgIsNetAbsent) {
+			if (prBssInfo && prBssInfo->fgIsNetAbsent) {
 				if (prBssInfo->ucBssFreeQuota >=
 					u4CurStaForwardFrameCount)
 					prBssInfo->ucBssFreeQuota -=
@@ -1995,7 +2008,7 @@ qmDequeueTxPacketsFromGlobalQueue(IN struct ADAPTER *prAdapter,
 		prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter,
 			prDequeuedPkt->ucBssIndex);
 
-		if (IS_BSS_ACTIVE(prBssInfo)) {
+		if (prBssInfo && IS_BSS_ACTIVE(prBssInfo)) {
 			if (!prBssInfo->fgIsNetAbsent) {
 				/* to record WMM Set */
 				prDequeuedPkt->ucWmmQueSet =
@@ -2952,6 +2965,16 @@ uint32_t gmGetDequeueQuota(
 		(prQM->fgIsTxResrouceControlEn == FALSE))
 		return u4TotalQuota;
 
+	if (!prBssInfo) {
+		DBGLOG(QM, INFO, "prBssInfo NULL\n");
+		return 0;
+	}
+
+	if (!prStaRec) {
+		DBGLOG(QM, INFO, "prStaRec NULL\n");
+		return 0;
+	}
+
 	if (prStaRec->ucDesiredPhyTypeSet & PHY_TYPE_BIT_VHT) {
 		if (prBssInfo->ucVhtChannelWidth >
 			VHT_OP_CHANNEL_WIDTH_20_40) {
@@ -3588,7 +3611,7 @@ u_int8_t qmDetectRxInvalidEAPOL(IN struct ADAPTER *prAdapter,
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
 
 	/* return FALSE if OP_MODE is not SAP */
-	if (!IS_BSS_ACTIVE(prBssInfo)
+	if (!prBssInfo || !IS_BSS_ACTIVE(prBssInfo)
 		|| prBssInfo->eCurrentOPMode != OP_MODE_ACCESS_POINT)
 		return FALSE;
 
@@ -3678,6 +3701,12 @@ u_int8_t qmAmsduAttackDetection(IN struct ADAPTER *prAdapter,
 	/* 802.11 header RA */
 	ucBssIndex = prSwRfb->prStaRec->ucBssIndex;
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
+	if (!prBssInfo) {
+		DBGLOG(QM, ERROR, "prBssInfo NULL for BssIndex:%u\n",
+				ucBssIndex);
+		return FALSE;
+	}
+
 	pucRaAddr = &prBssInfo->aucOwnMacAddr[0];
 
 	/* DA and SA */
@@ -3686,6 +3715,10 @@ u_int8_t qmAmsduAttackDetection(IN struct ADAPTER *prAdapter,
 
 	if (RXM_IS_QOS_DATA_FRAME(u2FrameCtrl)) {
 		ucTid = prSwRfb->ucTid;
+		if (ucTid >= TID_NUM) {
+			DBGLOG(QM, ERROR, "Invalid Tid:%u\n", ucTid);
+			return FALSE;
+		}
 	} else {
 		/* for non-qos data, use TID_NUM as tid */
 		ucTid = TID_NUM;
@@ -4126,7 +4159,7 @@ void qmInsertReorderPkt(IN struct ADAPTER *prAdapter,
 		if (u2Delta > QUARTER_SEQ_NO_COUNT) {
 			prReorderQueParm->fgNoDrop = TRUE;
 			prReorderQueParm->u4SNOverlapCount = 0;
-			DBGLOG_LIMITED(QM, INFO,
+			DBGLOG_LIMITED(QM, TRACE,
 				"QM: SSN jump over 1024:[%d]\n", u2Delta);
 		}
 		DBGLOG(RX, TEMP, "QM: Miss Count:[%lu]\n",
@@ -5601,55 +5634,43 @@ void mqmProcessBcn(IN struct ADAPTER *prAdapter,
 	for (i = 0; i < prAdapter->ucHwBssIdNum; i++) {
 		prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, i);
 
-		if (IS_BSS_ACTIVE(prBssInfo)) {
-			if (prBssInfo->eCurrentOPMode ==
-				OP_MODE_INFRASTRUCTURE &&
-			    prBssInfo->eConnectionState ==
-			    MEDIA_STATE_CONNECTED) {
-				/* P2P client or AIS infra STA */
-				if (EQUAL_MAC_ADDR(prBssInfo->aucBSSID,
-					((struct WLAN_MAC_MGMT_HEADER *)
-					(prSwRfb->pvHeader))->aucBSSID)) {
+		if (!prBssInfo || !IS_BSS_ACTIVE(prBssInfo))
+			continue;
 
-					fgNewParameter =
-						mqmParseEdcaParameters(
-							prAdapter,
-							prSwRfb, pucIE,
-							u2IELength, FALSE);
-#if (CFG_SUPPORT_802_11AX == 1)
-				if (fgEfuseCtrlAxOn == 1) {
-				fgNewMUEdca = mqmParseMUEdcaParams(
+		if (prBssInfo->eCurrentOPMode == OP_MODE_INFRASTRUCTURE &&
+		    prBssInfo->eConnectionState == MEDIA_STATE_CONNECTED) {
+			/* P2P client or AIS infra STA */
+			if (EQUAL_MAC_ADDR(prBssInfo->aucBSSID,
+				((struct WLAN_MAC_MGMT_HEADER *)
+				(prSwRfb->pvHeader))->aucBSSID)) {
+
+				fgNewParameter = mqmParseEdcaParameters(
 						prAdapter, prSwRfb, pucIE,
 						u2IELength, FALSE);
-					}
-#endif
-#if (CFG_SUPPORT_802_11BE == 1)
-				/*TODO */
-#endif
-
-				}
-			}
-
-			/* Appy new parameters if necessary */
-			if (fgNewParameter) {
-				nicQmUpdateWmmParms(prAdapter,
-					prBssInfo->ucBssIndex);
-				fgNewParameter = FALSE;
-			}
 #if (CFG_SUPPORT_802_11AX == 1)
-			if (fgEfuseCtrlAxOn == 1) {
-				if (fgNewMUEdca) {
-					nicQmUpdateMUEdcaParams(prAdapter,
-						prBssInfo->ucBssIndex);
-					fgNewMUEdca = FALSE;
-				}
+			if (fgEfuseCtrlAxOn == 1)
+				fgNewMUEdca = mqmParseMUEdcaParams(prAdapter,
+						prSwRfb, pucIE, u2IELength,
+						FALSE);
+#endif
 			}
-#endif
-#if (CFG_SUPPORT_802_11BE == 1)
-			/*TODO */
-#endif
 		}
-	}		/* end of IS_BSS_ACTIVE() */
+
+		/* Appy new parameters if necessary */
+		if (fgNewParameter) {
+			nicQmUpdateWmmParms(prAdapter, prBssInfo->ucBssIndex);
+			fgNewParameter = FALSE;
+		}
+#if (CFG_SUPPORT_802_11AX == 1)
+		if (fgEfuseCtrlAxOn == 1) {
+			if (fgNewMUEdca) {
+				nicQmUpdateMUEdcaParams(prAdapter,
+						prBssInfo->ucBssIndex);
+				fgNewMUEdca = FALSE;
+			}
+		}
+#endif
+	}
 }
 
 
@@ -5840,6 +5861,8 @@ mqmParseMUEdcaParams(
 		return FALSE;
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prStaRec->ucBssIndex);
+	if (!prBssInfo)
+		return FALSE;
 
 	/* Goal: Obtain the MU EDCA parameters */
 	IE_FOR_EACH(pucIE, u2IELength, u2Offset) {
@@ -5894,8 +5917,7 @@ mqmParseEdcaParameters(IN struct ADAPTER *prAdapter,
 	if (!pucIE)
 		return FALSE;
 
-	prStaRec = cnmGetStaRecByIndex(prAdapter,
-		prSwRfb->ucStaRecIdx);
+	prStaRec = cnmGetStaRecByIndex(prAdapter, prSwRfb->ucStaRecIdx);
 	/* ASSERT(prStaRec); */
 
 	if (prStaRec == NULL)
@@ -5909,8 +5931,10 @@ mqmParseEdcaParameters(IN struct ADAPTER *prAdapter,
 	    || (!prStaRec->fgIsQoS))
 		return FALSE;
 
-	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter,
-		prStaRec->ucBssIndex);
+	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prStaRec->ucBssIndex);
+
+	if (!prBssInfo)
+		return FALSE;
 
 	/* Goal: Obtain the EDCA parameters */
 	IE_FOR_EACH(pucIE, u2IELength, u2Offset) {
@@ -6074,7 +6098,7 @@ void mqmProcessScanResult(IN struct ADAPTER *prAdapter,
 		return;
 
 	u2IELength = prScanResult->u2IELength;
-	pucIE = prScanResult->aucIEBuf;
+	pucIE = prScanResult->pucIeBuf;
 
 	/* <1> Determine whether the peer supports WMM/QoS and UAPSDU */
 	IE_FOR_EACH(pucIE, u2IELength, u2Offset) {
@@ -6397,7 +6421,7 @@ void mqmGenerateWmmParamIE(IN struct ADAPTER *prAdapter,
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter,
 		prMsduInfo->ucBssIndex);
 
-	if (!prBssInfo->fgIsQBSS)
+	if (!prBssInfo || !prBssInfo->fgIsQBSS)
 		return;
 
 	prIeWmmParam = (struct IE_WMM_PARAM *)
@@ -6645,6 +6669,13 @@ enum ENUM_FRAME_ACTION qmGetFrameAction(IN struct ADAPTER *prAdapter,
 #endif
 		}
 		/* 4 <2> Drop, if BSS is inactive */
+		if (!prBssInfo) {
+			DBGLOG(QM, INFO,
+				"Drop packets (BSS is NULL)\n");
+			eFrameAction = FRAME_ACTION_DROP_PKT;
+			break;
+		}
+
 		if (!IS_BSS_ACTIVE(prBssInfo)) {
 			DBGLOG(QM, TRACE,
 				"Drop packets (BSS[%u] is INACTIVE)\n",
@@ -6769,6 +6800,11 @@ void qmHandleEventBssAbsencePresence(IN struct ADAPTER *prAdapter,
 		prEvent->aucBuffer);
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter,
 		prEventBssStatus->ucBssIndex);
+	if (!prBssInfo) {
+		DBGLOG(QM, INFO, "NAF:prBssInfo is NULL\n");
+		return;
+	}
+
 	fgIsNetAbsentOld = prBssInfo->fgIsNetAbsent;
 	prBssInfo->fgIsNetAbsent = prEventBssStatus->ucIsAbsent;
 	prBssInfo->ucBssFreeQuota = prEventBssStatus->ucBssFreeQuota;
@@ -8754,6 +8790,9 @@ void qmHandleDelTspec(struct ADAPTER *prAdapter, struct STA_RECORD *prStaRec,
 	uint8_t ucTc = 0;
 	struct BSS_INFO *prAisBssInfo = NULL;
 
+	if (eAci >= ACI_NUM)
+		return;
+
 	if (!prStaRec || eAci == ACI_NUM || eAci == ACI_BK || !prAdapter) {
 		DBGLOG(QM, ERROR, "prSta NULL %d, eAci %d, prAdapter NULL %d\n",
 		       !prStaRec, eAci, !prAdapter);
@@ -8772,10 +8811,14 @@ void qmHandleDelTspec(struct ADAPTER *prAdapter, struct STA_RECORD *prStaRec,
 		aisGetWMMInfo(prAdapter, prAisBssInfo->ucBssIndex));
 
 	while (prAcQueParam[eAci].ucIsACMSet &&
-			!(ucActivedTspec & BIT(eAci)) && eAci != ACI_BK) {
+			!(ucActivedTspec & BIT(eAci)) && eAci != ACI_BK
+			&& eAci < ACI_NUM) {
 		eAci = aeNextAci[eAci];
-		ucNewUp = aucNextUP[eAci];
+		if (eAci < ACI_NUM)
+			ucNewUp = aucNextUP[eAci];
 	}
+	if (eAci >= ACI_NUM)
+		return;
 	DBGLOG(QM, INFO, "new ACI %d, ACM %d, HasTs %d\n", eAci,
 	       prAcQueParam[eAci].ucIsACMSet, !!(ucActivedTspec & BIT(eAci)));
 	ucTc = aucWmmAC2TcResourceSet1[eAci];

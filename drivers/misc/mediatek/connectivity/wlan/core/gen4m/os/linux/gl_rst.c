@@ -1077,7 +1077,6 @@ int wlan_reset_thread_main(void *data)
 			if (KAL_WAKE_LOCK_ACTIVE(NULL, g_IntrWakeLock))
 				KAL_WAKE_UNLOCK(NULL, g_IntrWakeLock);
 #endif
-
 			if (g_IsWholeChipRst) {
 #if (CFG_ANDORID_CONNINFRA_COREDUMP_SUPPORT == 1)
 				if (eResetReason >= RST_REASON_MAX)

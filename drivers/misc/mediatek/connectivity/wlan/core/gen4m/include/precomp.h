@@ -68,6 +68,10 @@
  *******************************************************************************
  */
 
+#ifndef __NO_FORTIFY
+#define __NO_FORTIFY
+#endif
+
 #ifdef __GNUC__
 #if (DBG == 0)
 #pragma GCC diagnostic ignored "-Wformat"

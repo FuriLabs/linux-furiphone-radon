@@ -792,7 +792,7 @@ struct WIFI_CMD {
 	uint8_t ucReserved2[3];
 	uint32_t au4Reserved3[4];	/* padding fields */
 
-	uint8_t aucBuffer[0];
+	uint8_t aucBuffer[];
 };
 
 /* for Command Packet (via HIF-TX) */
@@ -809,7 +809,7 @@ struct WIFI_EVENT {
 	uint8_t aucReserved2[2];
 	uint8_t ucS2DIndex;
 
-	uint8_t aucBuffer[0];
+	uint8_t aucBuffer[];
 };
 
 /* CMD_ID_TEST_CTRL */
@@ -979,13 +979,13 @@ struct EVENT_NIC_CAPABILITY {
 struct EVENT_NIC_CAPABILITY_V2 {
 	uint16_t u2TotalElementNum;
 	uint8_t aucReserved[2];
-	uint8_t aucBuffer[0];
+	uint8_t aucBuffer[];
 };
 
 struct NIC_CAPABILITY_V2_ELEMENT {
 	uint32_t tag_type; /* NIC_CAPABILITY_V2_TAG_T */
 	uint32_t body_len;
-	uint8_t aucbody[0];
+	uint8_t aucbody[];
 };
 
 typedef uint32_t(*NIC_CAP_V2_ELEMENT_HDLR)(
@@ -1420,7 +1420,7 @@ struct CMD_DEV_INFO_UPDATE {
 	uint16_t u2TotalElementNum;
 	uint8_t ucAppendCmdTLV;
 	uint8_t aucReserve[3];
-	uint8_t aucBuffer[0];
+	uint8_t aucBuffer[];
 	/* CMD_DEVINFO_ACTIVE_T rCmdDevInfoActive; */
 };
 
@@ -1431,7 +1431,7 @@ struct CMD_BSS_INFO_UPDATE {
 	uint16_t u2TotalElementNum;
 	uint32_t u4Reserve;
 	/* CMD_BSSINFO_BASIC_T rCmdBssInfoBasic; */
-	uint8_t aucBuffer[0];
+	uint8_t aucBuffer[];
 };
 
 /*  STA record command */
@@ -1441,7 +1441,7 @@ struct CMD_STAREC_UPDATE {
 	uint8_t ucWlanIdx;
 	uint16_t u2TotalElementNum;
 	uint32_t u4Reserve;
-	uint8_t aucBuffer[0];
+	uint8_t aucBuffer[];
 };
 
 struct EXT_EVENT_BF_STATUS_T {
@@ -1953,7 +1953,7 @@ struct CMD_SET_COUNTRY_CHANNEL_POWER_LIMIT_V2 {
 	uint8_t eband; /*ENUM_BAND_T*/
 	uint8_t usReserved[2];
 	uint32_t countryCode;
-	struct CMD_CHANNEL_POWER_LIMIT_V2 rChannelPowerLimit[0];
+	struct CMD_CHANNEL_POWER_LIMIT_V2 rChannelPowerLimit[];
 };
 
 #define BF_TX_PWR_LIMIT_SECTION_NUM 17
@@ -2475,7 +2475,7 @@ struct EVENT_DEBUG_MSG {
 	uint32_t u4Value;	/* memory addre or ... */
 	uint16_t u2MsgSize;
 	uint8_t aucReserved0[2];
-	uint8_t aucMsg[1];
+	uint8_t aucMsg[];
 };
 
 struct CMD_EDGE_TXPWR_LIMIT {
@@ -2682,7 +2682,7 @@ struct CMD_SCHED_SCAN_REQ {
 	uint32_t u4SlowScanPeriod;
 	uint8_t aucPadding_3[47];
 	/* keep last */
-	uint8_t aucIE[0];             /* MUST be the last for IE content */
+	uint8_t aucIE[];             /* MUST be the last for IE content */
 };
 
 struct EVENT_SCHED_SCAN_DONE {
@@ -2851,7 +2851,7 @@ struct EVENT_WIFI_RDD_TEST {
 	uint32_t u4Count;
 	uint8_t ucRddIdx;
 	uint8_t aucReserve[3];
-	uint8_t aucBuffer[0];
+	uint8_t aucBuffer[];
 };
 
 #if (CFG_SUPPORT_ICS == 1)
@@ -2920,7 +2920,7 @@ struct EXT_EVENT_GET_TX_POWER {
 struct EXT_EVENT_RF_TEST_RESULT_T {
 	uint32_t u4FuncIndex;
 	uint32_t u4PayloadLength;
-	uint8_t  aucEvent[0];
+	uint8_t  aucEvent[];
 };
 
 struct EXT_EVENT_RBIST_DUMP_DATA_T {
@@ -3191,13 +3191,13 @@ struct EVENT_LOW_LATENCY_INFO {
 struct _CMD_EVENT_TLV_COMMOM_T {
 	uint16_t u2TotalElementNum;
 	uint8_t aucReserved[2];
-	uint8_t aucBuffer[0];
+	uint8_t aucBuffer[];
 };
 
 struct _CMD_EVENT_TLV_ELEMENT_T {
 	uint32_t tag_type;
 	uint32_t body_len;
-	uint8_t aucbody[0];
+	uint8_t aucbody[];
 };
 
 struct _TXM_CMD_EVENT_TEST_T {

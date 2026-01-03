@@ -278,7 +278,7 @@ enum ENUM_HAL_PHY_ACTION_TAG {
 struct HAL_PHY_ACTION_TLV {
 	uint16_t u2Tag;
 	uint16_t u2BufLength;
-	uint8_t  aucBuffer[0];
+	uint8_t  aucBuffer[];
 };
 
 struct HAL_PHY_ACTION_TLV_HEADER {
@@ -286,7 +286,7 @@ struct HAL_PHY_ACTION_TLV_HEADER {
 	uint8_t  ucTagNums;
 	uint8_t  ucVersion;
 	uint16_t u2BufLength;
-	uint8_t  aucBuffer[0];
+	uint8_t  aucBuffer[];
 };
 #endif /* (CFG_SUPPORT_PRE_ON_PHY_ACTION == 1) */
 

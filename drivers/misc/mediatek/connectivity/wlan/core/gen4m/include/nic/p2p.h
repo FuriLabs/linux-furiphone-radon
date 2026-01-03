@@ -99,7 +99,7 @@
 /* Device Capability Definition. */
 #define P2P_MAXIMUM_NOA_COUNT                       8
 
-#define P2P_MAX_AKM_SUITES 5
+#define P2P_MAX_AKM_SUITES 2
 
 #define P2P_MAX_SUPPORTED_CHANNEL_LIST_SIZE 51	/* Contains 6 sub-band. */
 
@@ -111,7 +111,10 @@
 
 /* Device Charactoristic. */
 /* 1000 is too short , the deauth would block in the queue */
-#define P2P_AP_CHNL_HOLD_TIME_MS 5000
+
+#define SAP_CHNL_HOLD_TIME_MS		200
+#define P2P_CHNL_HOLD_TIME_MS		5000
+
 #define P2P_DEFAULT_LISTEN_CHANNEL                   1
 
 #if (CFG_SUPPORT_DFS_MASTER == 1)

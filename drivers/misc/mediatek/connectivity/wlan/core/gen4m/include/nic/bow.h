@@ -107,7 +107,7 @@ struct BT_OVER_WIFI_COMMAND_HEADER {
 
 struct BT_OVER_WIFI_COMMAND {
 	struct BT_OVER_WIFI_COMMAND_HEADER rHeader;
-	uint8_t aucPayload[0];
+	uint8_t aucPayload[];
 };
 
 struct BT_OVER_WIFI_EVENT_HEADER {
@@ -118,7 +118,7 @@ struct BT_OVER_WIFI_EVENT_HEADER {
 
 struct BT_OVER_WIFI_EVENT {
 	struct BT_OVER_WIFI_EVENT_HEADER rHeader;
-	uint8_t aucPayload[0];
+	uint8_t aucPayload[];
 };
 
 struct CHANNEL_DESC {

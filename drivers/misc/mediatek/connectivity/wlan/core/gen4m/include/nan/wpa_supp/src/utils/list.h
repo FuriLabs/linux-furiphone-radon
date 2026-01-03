@@ -14,7 +14,6 @@
 #ifndef LIST_H
 #define LIST_H
 
-#include <stddef.h>
 /*#define NULL            (0)*/
 
 /**

@@ -893,7 +893,7 @@ struct HW_MAC_MSDU_REPORT {
 
 	/* DW 2 */
 	/* MSDU token array */
-	union HW_MAC_MSDU_TOKEN_T au4MsduToken[0];
+	union HW_MAC_MSDU_TOKEN_T au4MsduToken[];
 };
 
 struct SW_RX_RPT_BLK_RXV {
@@ -905,13 +905,13 @@ struct SW_RX_RPT_BLK_RXV {
 
 struct HW_MAC_RX_RPT_BLK {
 	uint32_t u4Header[RX_RPT_BLK_HDR_LEN];
-	uint32_t u4Rxv[0];
+	uint32_t u4Rxv[];
 };
 
 struct HW_MAC_RX_REPORT {
 	uint32_t u4Header[RX_RPT_HDR_LEN];
 	uint32_t u4UserInfo[RX_RPT_USER_INFO_LEN];
-	struct HW_MAC_RX_RPT_BLK rRxvBlk[0];
+	struct HW_MAC_RX_RPT_BLK rRxvBlk[];
 };
 
 struct SW_RFB {

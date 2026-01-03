@@ -483,7 +483,7 @@ struct CONNAC2X_WIFI_CMD {
 	uint8_t ucReserved2[3];
 	uint32_t au4Reserved3[4];	/* padding fields */
 
-	uint8_t aucBuffer[0];
+	uint8_t aucBuffer[];
 };
 
 union WTBL_LMAC_DW0 {

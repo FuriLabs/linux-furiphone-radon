@@ -811,14 +811,14 @@ firmwareHexDump(const uint8_t *pucPreFix,
 
 		switch (i4PreFixType) {
 		case DUMP_PREFIX_ADDRESS:
-			pr_debug("%s%p: %s\n",
+			pr_info("%s%p: %s\n",
 				pucPreFix, pucPtr + i, ucLineBuf);
 			break;
 		case DUMP_PREFIX_OFFSET:
-			pr_debug("%s%.8x: %s\n", pucPreFix, i, ucLineBuf);
+			pr_info("%s%.8x: %s\n", pucPreFix, i, ucLineBuf);
 			break;
 		default:
-			pr_debug("%s%s\n", pucPreFix, ucLineBuf);
+			pr_info("%s%s\n", pucPreFix, ucLineBuf);
 			break;
 		}
 	}
@@ -858,7 +858,7 @@ void wlanPrintFwLog(uint8_t *pucLogContent,
 		if (*(pucChr - 1) == '\n')
 			*(pucChr - 1) = '\0';
 
-//		LOG_FUNC("<FW>%s\n", pucLogContent);
+		LOG_FUNC("<FW>%s\n", pucLogContent);
 	}
 	break;
 	case DEBUG_MSG_TYPE_DRIVER:

@@ -393,9 +393,7 @@ int32_t mddpNotifyDrvTxd(IN struct ADAPTER *prAdapter,
 	struct BSS_INFO *prBssInfo = (struct BSS_INFO *) NULL;
 	struct net_device *prNetdev;
 	struct NETDEV_PRIVATE_GLUE_INFO *prNetDevPrivate;
-#if CFG_TRI_TX_RING
 	struct BUS_INFO *bus_info;
-#endif
 	uint32_t u32BufSize = 0;
 	uint8_t *buff = NULL;
 	int32_t ret = 0;
@@ -429,9 +427,7 @@ int32_t mddpNotifyDrvTxd(IN struct ADAPTER *prAdapter,
 			prAdapter->prGlueInfo, prStaRec->ucBssIndex);
 	prNetDevPrivate = (struct NETDEV_PRIVATE_GLUE_INFO *)
 			netdev_priv(prNetdev);
-#if CFG_TRI_TX_RING
 	bus_info = prAdapter->chip_info->bus_info;
-#endif
 
 	if (!prNetDevPrivate->ucMddpSupport) {
 		DBGLOG(NIC, ERROR, "mddp not support\n");
@@ -469,10 +465,15 @@ int32_t mddpNotifyDrvTxd(IN struct ADAPTER *prAdapter,
 #if CFG_TRI_TX_RING
 	if (bus_info->tx_ring0_data_idx != bus_info->tx_ring3_data_idx)
 		prMddpTxd->wmmset = prBssInfo->ucWmmQueSet % 3;
-	else
+	else if (bus_info->tx_ring0_data_idx != bus_info->tx_ring1_data_idx)
 		prMddpTxd->wmmset = prBssInfo->ucWmmQueSet % 2;
+	else
+		prMddpTxd->wmmset = 0;
 #else
-	prMddpTxd->wmmset = prBssInfo->ucWmmQueSet % 2;
+	if (bus_info->tx_ring0_data_idx != bus_info->tx_ring1_data_idx)
+		prMddpTxd->wmmset = prBssInfo->ucWmmQueSet % 2;
+	else
+		prMddpTxd->wmmset = 0;
 #endif
 	kalMemCopy(prMddpTxd->nw_if_name, prNetdev->name,
 			sizeof(prMddpTxd->nw_if_name));

@@ -90,8 +90,6 @@
 #define KEY_BUF_SIZE	1024
 #endif
 
-#define IW_AUTH_WPA_VERSION_WPA3        0x00000008
-
 /*******************************************************************************
  *                             D A T A   T Y P E S
  *******************************************************************************
@@ -1388,9 +1386,6 @@ int mtk_cfg80211_connect(struct wiphy *wiphy,
 	else if (sme->crypto.wpa_versions & NL80211_WPA_VERSION_2)
 		prWpaInfo->u4WpaVersion =
 			IW_AUTH_WPA_VERSION_WPA2;
-	else if (sme->crypto.wpa_versions & NL80211_WPA_VERSION_3)
-		prWpaInfo->u4WpaVersion =
-			IW_AUTH_WPA_VERSION_WPA3;
 	else
 		prWpaInfo->u4WpaVersion =
 			IW_AUTH_WPA_VERSION_DISABLED;
@@ -1586,21 +1581,6 @@ int mtk_cfg80211_connect(struct wiphy *wiphy,
 			case WLAN_AKM_SUITE_OWE:
 				eAuthMode = AUTH_MODE_WPA3_OWE;
 				u4AkmSuite = RSN_AKM_SUITE_OWE;
-				break;
-			default:
-				DBGLOG(REQ, WARN, "invalid Akm Suite (%d)\n",
-				       sme->crypto.akm_suites[0]);
-				return -EINVAL;
-			}
-		} else if (prWpaInfo->u4WpaVersion ==
-			   IW_AUTH_WPA_VERSION_WPA3) {
-			switch (sme->crypto.akm_suites[0]) {
-			case WLAN_AKM_SUITE_SAE:
-				if (sme->auth_type == NL80211_AUTHTYPE_SAE)
-					eAuthMode = AUTH_MODE_WPA3_SAE;
-				else
-					eAuthMode = AUTH_MODE_OPEN;
-				u4AkmSuite = RSN_AKM_SUITE_SAE;
 				break;
 			default:
 				DBGLOG(REQ, WARN, "invalid Akm Suite (%d)\n",
@@ -2339,9 +2319,6 @@ int mtk_cfg80211_set_rekey_data(struct wiphy *wiphy,
 
 	prGtkData->u4Proto = NL80211_WPA_VERSION_2;
 	if (prWpaInfo->u4WpaVersion ==
-		IW_AUTH_WPA_VERSION_WPA3)
-		prGtkData->u4Proto = NL80211_WPA_VERSION_3;
-	else if (prWpaInfo->u4WpaVersion ==
 	    IW_AUTH_WPA_VERSION_WPA)
 		prGtkData->u4Proto = NL80211_WPA_VERSION_1;
 
@@ -4135,6 +4112,12 @@ mtk_cfg80211_change_station(struct wiphy *wiphy,
 	struct ADAPTER *prAdapter;
 	struct BSS_INFO *prBssInfo;
 	uint8_t ucBssIndex = 0;
+#if KERNEL_VERSION(6, 0, 0) <= CFG80211_VERSION_CODE
+	struct link_station_parameters *prLinkParams =
+		&(params->link_sta_params);
+#else
+	struct station_parameters *prLinkParams = params;
+#endif
 
 	WIPHY_PRIV(wiphy, prGlueInfo);
 	ASSERT(prGlueInfo);
@@ -4159,19 +4142,19 @@ mtk_cfg80211_change_station(struct wiphy *wiphy,
 			FALSE, FALSE, &u4BufLen);
 	}
 
-	if (params->supported_rates == NULL)
+	if (prLinkParams->supported_rates == NULL)
 		return 0;
 
 	/* init */
 	kalMemZero(&rCmdUpdate, sizeof(rCmdUpdate));
 	kalMemCopy(rCmdUpdate.aucPeerMac, mac, 6);
 
-	if (params->supported_rates != NULL) {
+	if (prLinkParams->supported_rates != NULL) {
 
-		u4Temp = params->supported_rates_len;
+		u4Temp = prLinkParams->supported_rates_len;
 		if (u4Temp > CMD_PEER_UPDATE_SUP_RATE_MAX)
 			u4Temp = CMD_PEER_UPDATE_SUP_RATE_MAX;
-		kalMemCopy(rCmdUpdate.aucSupRate, params->supported_rates,
+		kalMemCopy(rCmdUpdate.aucSupRate, prLinkParams->supported_rates,
 			   u4Temp);
 		rCmdUpdate.u2SupRateLen = u4Temp;
 	}
@@ -4194,30 +4177,30 @@ mtk_cfg80211_change_station(struct wiphy *wiphy,
 		rCmdUpdate.u2ExtCapLen = u4Temp;
 	}
 
-	if (params->ht_capa != NULL) {
+	if (prLinkParams->ht_capa != NULL) {
 
-		rCmdUpdate.rHtCap.u2CapInfo = params->ht_capa->cap_info;
+		rCmdUpdate.rHtCap.u2CapInfo = prLinkParams->ht_capa->cap_info;
 		rCmdUpdate.rHtCap.ucAmpduParamsInfo =
-			params->ht_capa->ampdu_params_info;
+			prLinkParams->ht_capa->ampdu_params_info;
 		rCmdUpdate.rHtCap.u2ExtHtCapInfo =
-			params->ht_capa->extended_ht_cap_info;
+			prLinkParams->ht_capa->extended_ht_cap_info;
 		rCmdUpdate.rHtCap.u4TxBfCapInfo =
-			params->ht_capa->tx_BF_cap_info;
+			prLinkParams->ht_capa->tx_BF_cap_info;
 		rCmdUpdate.rHtCap.ucAntennaSelInfo =
-			params->ht_capa->antenna_selection_info;
+			prLinkParams->ht_capa->antenna_selection_info;
 		kalMemCopy(rCmdUpdate.rHtCap.rMCS.arRxMask,
-			   params->ht_capa->mcs.rx_mask,
+			   prLinkParams->ht_capa->mcs.rx_mask,
 			   sizeof(rCmdUpdate.rHtCap.rMCS.arRxMask));
 
 		rCmdUpdate.rHtCap.rMCS.u2RxHighest =
-			params->ht_capa->mcs.rx_highest;
+			prLinkParams->ht_capa->mcs.rx_highest;
 		rCmdUpdate.rHtCap.rMCS.ucTxParams =
-			params->ht_capa->mcs.tx_params;
+			prLinkParams->ht_capa->mcs.tx_params;
 		rCmdUpdate.fgIsSupHt = TRUE;
 	}
 	/* vht */
 
-	if (params->vht_capa != NULL) {
+	if (prLinkParams->vht_capa != NULL) {
 		/* rCmdUpdate.rVHtCap */
 		/* rCmdUpdate.rVHtCap */
 	}
@@ -6898,10 +6881,17 @@ int mtk_cfg_change_iface(struct wiphy *wiphy,
 	return 0;
 }
 
+#if (KERNEL_VERSION(6, 1, 0) <= CFG80211_VERSION_CODE)
+int mtk_cfg_add_key(struct wiphy *wiphy,
+		    struct net_device *ndev, int link_id, u8 key_index,
+		    bool pairwise, const u8 *mac_addr,
+		    struct key_params *params)
+#else
 int mtk_cfg_add_key(struct wiphy *wiphy,
 		    struct net_device *ndev, u8 key_index,
 		    bool pairwise, const u8 *mac_addr,
 		    struct key_params *params)
+#endif
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
 
@@ -6922,10 +6912,17 @@ int mtk_cfg_add_key(struct wiphy *wiphy,
 				    mac_addr, params);
 }
 
+#if (KERNEL_VERSION(6, 1, 0) <= CFG80211_VERSION_CODE)
+int mtk_cfg_get_key(struct wiphy *wiphy,
+		    struct net_device *ndev, int link_id, u8 key_index,
+		    bool pairwise, const u8 *mac_addr, void *cookie,
+		    void (*callback)(void *cookie, struct key_params *))
+#else
 int mtk_cfg_get_key(struct wiphy *wiphy,
 		    struct net_device *ndev, u8 key_index,
 		    bool pairwise, const u8 *mac_addr, void *cookie,
 		    void (*callback)(void *cookie, struct key_params *))
+#endif
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
 
@@ -6945,9 +6942,15 @@ int mtk_cfg_get_key(struct wiphy *wiphy,
 				    pairwise, mac_addr, cookie, callback);
 }
 
+#if (KERNEL_VERSION(6, 1, 0) <= CFG80211_VERSION_CODE)
+int mtk_cfg_del_key(struct wiphy *wiphy,
+		    struct net_device *ndev, int link_id, u8 key_index,
+		    bool pairwise, const u8 *mac_addr)
+#else
 int mtk_cfg_del_key(struct wiphy *wiphy,
 		    struct net_device *ndev, u8 key_index,
 		    bool pairwise, const u8 *mac_addr)
+#endif
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
 
@@ -6967,9 +6970,15 @@ int mtk_cfg_del_key(struct wiphy *wiphy,
 				    pairwise, mac_addr);
 }
 
+#if (KERNEL_VERSION(6, 1, 0) <= CFG80211_VERSION_CODE)
+int mtk_cfg_set_default_key(struct wiphy *wiphy,
+			    struct net_device *ndev, int link_id,
+			    u8 key_index, bool unicast, bool multicast)
+#else
 int mtk_cfg_set_default_key(struct wiphy *wiphy,
 			    struct net_device *ndev,
 			    u8 key_index, bool unicast, bool multicast)
+#endif
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
 
@@ -6989,8 +6998,13 @@ int mtk_cfg_set_default_key(struct wiphy *wiphy,
 					    key_index, unicast, multicast);
 }
 
+#if (KERNEL_VERSION(6, 1, 0) <= CFG80211_VERSION_CODE)
+int mtk_cfg_set_default_mgmt_key(struct wiphy *wiphy,
+		struct net_device *ndev, int link_id, u8 key_index)
+#else
 int mtk_cfg_set_default_mgmt_key(struct wiphy *wiphy,
 		struct net_device *ndev, u8 key_index)
+#endif
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
 
@@ -7116,7 +7130,13 @@ int mtk_cfg_tdls_oper(struct wiphy *wiphy,
 	return mtk_cfg80211_tdls_oper(wiphy, ndev, peer, oper);
 }
 
-#if KERNEL_VERSION(3, 18, 0) <= CFG80211_VERSION_CODE
+#if KERNEL_VERSION(6, 3, 0) <= CFG80211_VERSION_CODE
+int mtk_cfg_tdls_mgmt(struct wiphy *wiphy,
+		      struct net_device *dev, const u8 *peer,
+		      int link_id, u8 action_code, u8 dialog_token,
+		      u16 status_code, u32 peer_capability,
+		      bool initiator, const u8 *buf, size_t len)
+#elif KERNEL_VERSION(3, 18, 0) <= CFG80211_VERSION_CODE
 int mtk_cfg_tdls_mgmt(struct wiphy *wiphy,
 		      struct net_device *dev,
 		      const u8 *peer, u8 action_code, u8 dialog_token,
@@ -7776,6 +7796,11 @@ int mtk_cfg_testmode_cmd(struct wiphy *wiphy, void *data,
 	struct GLUE_INFO *prGlueInfo = NULL;
 
 	WIPHY_PRIV(wiphy, prGlueInfo);
+	if (!wdev) {
+		DBGLOG(REQ, ERROR,
+			"mtk_cfg80211_testmode_cmd null wdev\n");
+		return -EINVAL;
+	}
 
 	if ((!prGlueInfo) || (prGlueInfo->u4ReadyFlag == 0)) {
 		DBGLOG(REQ, WARN, "driver is not ready\n");
@@ -7923,8 +7948,12 @@ int mtk_cfg_change_beacon(struct wiphy *wiphy,
 	return mtk_p2p_cfg80211_change_beacon(wiphy, dev, info);
 }
 
-int mtk_cfg_stop_ap(struct wiphy *wiphy,
-		    struct net_device *dev)
+#if (KERNEL_VERSION(5, 19, 2) <= CFG80211_VERSION_CODE)
+int mtk_cfg_stop_ap(struct wiphy *wiphy, struct net_device *dev,
+	unsigned int link_id)
+#else
+int mtk_cfg_stop_ap(struct wiphy *wiphy, struct net_device *dev)
+#endif
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
 
@@ -7959,10 +7988,18 @@ int mtk_cfg_set_wiphy_params(struct wiphy *wiphy,
 	return mtk_p2p_cfg80211_set_wiphy_params(wiphy, changed);
 }
 
+#if (KERNEL_VERSION(5, 19, 2) <= CFG80211_VERSION_CODE)
+int mtk_cfg_set_bitrate_mask(struct wiphy *wiphy,
+			     struct net_device *dev,
+			     unsigned int link_id,
+			     const u8 *peer,
+			     const struct cfg80211_bitrate_mask *mask)
+#else
 int mtk_cfg_set_bitrate_mask(struct wiphy *wiphy,
 			     struct net_device *dev,
 			     const u8 *peer,
 			     const struct cfg80211_bitrate_mask *mask)
+#endif
 {
 	struct GLUE_INFO *prGlueInfo = NULL;
 

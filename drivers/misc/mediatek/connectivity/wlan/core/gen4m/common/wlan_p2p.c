@@ -551,8 +551,7 @@ wlanoidSetP2pNetworkAddress(IN struct ADAPTER *prAdapter,
 	uint32_t rStatus = WLAN_STATUS_SUCCESS;
 	uint32_t i, j;
 	struct CMD_SET_NETWORK_ADDRESS_LIST *prCmdNWAddrList;
-	struct PARAM_NETWORK_ADDRESS_LIST *prNWAddrList =
-		(struct PARAM_NETWORK_ADDRESS_LIST *) pvSetBuffer;
+	struct PARAM_NETWORK_ADDRESS_LIST *prNWAddrList = pvSetBuffer;
 	struct PARAM_NETWORK_ADDRESS *prNWAddress;
 	struct PARAM_NETWORK_ADDRESS_IP *prNetAddrIp;
 	uint32_t u4IpAddressCount, u4CmdSize;
@@ -571,7 +570,7 @@ wlanoidSetP2pNetworkAddress(IN struct ADAPTER *prAdapter,
 	*pu4SetInfoLen = 0;
 	u4IpAddressCount = 0;
 
-	prNWAddress = prNWAddrList->arAddress;
+	prNWAddress = (struct PARAM_NETWORK_ADDRESS *)(prNWAddrList + 1);
 	for (i = 0; i < prNWAddrList->u4AddressCount; i++) {
 		if (prNWAddress->u2AddressType
 				== PARAM_PROTOCOL_ID_TCP_IP &&
@@ -600,7 +599,7 @@ wlanoidSetP2pNetworkAddress(IN struct ADAPTER *prAdapter,
 	/* fill P_CMD_SET_NETWORK_ADDRESS_LIST */
 	prCmdNWAddrList->ucBssIndex = prNWAddrList->ucBssIdx;
 	prCmdNWAddrList->ucAddressCount = (uint8_t) u4IpAddressCount;
-	prNWAddress = prNWAddrList->arAddress;
+	prNWAddress = (struct PARAM_NETWORK_ADDRESS *)(prNWAddrList + 1);
 	for (i = 0, j = 0; i < prNWAddrList->u4AddressCount; i++) {
 		if (prNWAddress->u2AddressType
 				== PARAM_PROTOCOL_ID_TCP_IP &&
@@ -773,8 +772,7 @@ wlanoidSetP2pSetNetworkAddress(IN struct ADAPTER *prAdapter,
 	uint32_t rStatus = WLAN_STATUS_SUCCESS;
 	uint32_t i, j;
 	struct CMD_SET_NETWORK_ADDRESS_LIST *prCmdNWAddrList;
-	struct PARAM_NETWORK_ADDRESS_LIST *prNWAddrList =
-		(struct PARAM_NETWORK_ADDRESS_LIST *) pvSetBuffer;
+	struct PARAM_NETWORK_ADDRESS_LIST *prNWAddrList = pvSetBuffer;
 	struct PARAM_NETWORK_ADDRESS *prNWAddress;
 	struct PARAM_NETWORK_ADDRESS_IP *prNetAddrIp;
 	uint32_t u4IpAddressCount, u4CmdSize;
@@ -796,7 +794,7 @@ wlanoidSetP2pSetNetworkAddress(IN struct ADAPTER *prAdapter,
 	*pu4SetInfoLen = 0;
 	u4IpAddressCount = 0;
 
-	prNWAddress = prNWAddrList->arAddress;
+	prNWAddress = (struct PARAM_NETWORK_ADDRESS *)(prNWAddrList + 1);
 	for (i = 0; i < prNWAddrList->u4AddressCount; i++) {
 		if (prNWAddress->u2AddressType
 				== PARAM_PROTOCOL_ID_TCP_IP &&
@@ -832,7 +830,8 @@ wlanoidSetP2pSetNetworkAddress(IN struct ADAPTER *prAdapter,
 	if (prAdapter->fgEnArpFilter) {
 		prCmdNWAddrList->ucAddressCount =
 			(uint8_t) u4IpAddressCount;
-		prNWAddress = prNWAddrList->arAddress;
+		prNWAddress =
+			(struct PARAM_NETWORK_ADDRESS *)(prNWAddrList + 1);
 
 		DBGLOG(INIT, INFO, "u4IpAddressCount (%u)\n",
 			(int32_t) u4IpAddressCount);
@@ -1478,6 +1477,8 @@ wlanoidSetUApsdParam(IN struct ADAPTER *prAdapter,
 	prUapsdParam = (struct PARAM_CUSTOM_UAPSD_PARAM_STRUCT *) pvSetBuffer;
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prUapsdParam->ucBssIdx);
+	if (!prBssInfo)
+		return WLAN_STATUS_NOT_SUPPORTED;
 	prPmProfSetupInfo = &prBssInfo->rPmProfSetupInfo;
 
 	kalMemZero(&rCmdUapsdParam,

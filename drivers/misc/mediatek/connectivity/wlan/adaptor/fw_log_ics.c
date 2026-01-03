@@ -1,8 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
-
 /*
- * Copyright (c) 2021 MediaTek Inc.
- */
+* Copyright (c) 2016 MediaTek Inc.
+*/
 
 #ifdef CONFIG_MTK_CONNSYS_DEDICATED_LOG_PATH
 
@@ -24,6 +23,7 @@
 #include <linux/string.h>
 #include "fw_log_ics.h"
 #include "wlan_ring.h"
+#include <linux/version.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 
@@ -48,43 +48,43 @@ MODULE_LICENSE("Dual BSD/GPL");
 #define ICS_DBG(fmt, arg...)	\
 	do { \
 		if (icsDbgLevel >= ICS_FW_LOG_DBG) \
-			pr_debug(PFX "%s[D]: " fmt, __func__, ##arg); \
+			pr_info(PFX "%s[D]: " fmt, __func__, ##arg); \
 	} while (0)
 #define ICS_DBG_LIMITED(fmt, arg...)	\
 	do { \
 		if (icsDbgLevel >= ICS_FW_LOG_DBG) \
-			pr_debug(PFX "%s[D]: " fmt, __func__, \
+			pr_info_ratelimited(PFX "%s[D]: " fmt, __func__, \
 				##arg); \
 	} while (0)
 #define ICS_INFO(fmt, arg...)	\
 	do { \
 		if (icsDbgLevel >= ICS_FW_LOG_INFO) \
-			pr_debug(PFX "%s[I]: " fmt, __func__, ##arg); \
+			pr_info(PFX "%s[I]: " fmt, __func__, ##arg); \
 	} while (0)
 #define ICS_INFO_LIMITED(fmt, arg...)	\
 	do { \
 		if (icsDbgLevel >= ICS_FW_LOG_INFO) \
-			pr_debug(PFX "%s[L]: " fmt, __func__, \
+			pr_info_ratelimited(PFX "%s[L]: " fmt, __func__, \
 				##arg); \
 	} while (0)
 #define ICS_WARN(fmt, arg...)	\
 	do { \
 		if (icsDbgLevel >= ICS_FW_LOG_WARN) \
-			pr_debug(PFX "%s[W]: " fmt, __func__, ##arg); \
+			pr_info(PFX "%s[W]: " fmt, __func__, ##arg); \
 	} while (0)
 #define ICS_WARN_LIMITED(fmt, arg...)	\
 	do { \
 		if (icsDbgLevel >= ICS_FW_LOG_WARN) \
-			pr_debug(PFX "%s[W]: " fmt, __func__, \
+			pr_info_ratelimited(PFX "%s[W]: " fmt, __func__, \
 				##arg); \
 	} while (0)
 #define ICS_ERR(fmt, arg...)	\
 	do { \
-		pr_debug(PFX "%s[E]: " fmt, __func__, ##arg); \
+		pr_info(PFX "%s[E]: " fmt, __func__, ##arg); \
 	} while (0)
 #define ICS_ERR_LIMITED(fmt, arg...)	\
 	do { \
-		pr_debug(PFX "%s[E]: " fmt, __func__, \
+		pr_info_ratelimited(PFX "%s[E]: " fmt, __func__, \
 			##arg); \
 	} while (0)
 
@@ -390,8 +390,11 @@ int fw_log_ics_init(void)
 	if (result < 0)
 		return result;
 
-	gIcsDev->driver_class = class_create(THIS_MODULE,
-		FW_LOG_ICS_DRIVER_NAME);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0))
+	gIcsDev->driver_class = class_create(FW_LOG_ICS_DRIVER_NAME);
+#else
+	gIcsDev->driver_class = class_create(THIS_MODULE, FW_LOG_ICS_DRIVER_NAME);
+#endif
 
 	if (IS_ERR(gIcsDev->driver_class)) {
 		result = -ENOMEM;

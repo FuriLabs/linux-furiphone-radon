@@ -1414,12 +1414,14 @@ uint32_t wlanAdapterStart(IN struct ADAPTER *prAdapter,
 			case RAM_CODE_DOWNLOAD_FAIL:
 			case SET_CHIP_ECO_INFO_FAIL:
 				halHifSwInfoUnInit(prAdapter->prGlueInfo);
+			kal_fallthrough;
 			case INIT_HIFINFO_FAIL:
 				nicRxUninitialize(prAdapter);
 				nicTxRelease(prAdapter, FALSE);
 				/* System Service Uninitialization */
 				nicUninitSystemService(prAdapter);
 			/* fallthrough */
+			kal_fallthrough;
 			case INIT_ADAPTER_FAIL:
 			/* fallthrough */
 			case DRIVER_OWN_FAIL:
@@ -4511,7 +4513,7 @@ void wlanClearScanningResult(IN struct ADAPTER *prAdapter,
 				    &(prWlanInfo->arScanResult[0]),
 				    &(prWlanInfo->arScanResult[i]),
 				    OFFSET_OF(struct PARAM_BSSID_EX,
-					      aucIEs));
+					      pucIE));
 			}
 
 			if (prWlanInfo->arScanResult[i].u4IELength > 0) {
@@ -4586,7 +4588,7 @@ void wlanClearBssInScanningResult(IN struct ADAPTER
 				kalMemCopy(&(prWlanInfo->arScanResult[j - 1]),
 					   &(prWlanInfo->arScanResult[j]),
 					   OFFSET_OF(struct PARAM_BSSID_EX,
-					   aucIEs));
+					   pucIE));
 
 				prWlanInfo->apucScanResultIEs[j - 1] =
 					prWlanInfo->apucScanResultIEs[j];
@@ -5336,6 +5338,16 @@ uint32_t wlanLoadManufactureData(IN struct ADAPTER
 			   index, u4NvramStartOffset,
 			   u1TypeID, u4NvramFragmentSize);
 
+			if (u4NvramFragmentSize >
+				sizeof(struct CMD_NVRAM_FRAGMENT)) {
+				DBGLOG(INIT, ERROR,
+				"ID[%d]copy size[%d]bigger than buf size[%d]\n",
+				u1TypeID,
+				u4NvramFragmentSize,
+				sizeof(struct CMD_NVRAM_FRAGMENT));
+				return WLAN_STATUS_FAILURE;
+			}
+
 			kalMemCopy(prCmdNvramFragment,
 					   (pu1Addr + u4NvramStartOffset),
 					   u4NvramFragmentSize);
@@ -5799,6 +5811,12 @@ uint8_t wlanGetChannelNumberByNetwork(IN struct ADAPTER
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
 
+	if (prBssInfo == NULL) {
+		DBGLOG(INIT, ERROR,
+		"ucBssIndex= %d prBssInfo is Null\n", ucBssIndex);
+		return 0;
+	}
+
 	return prBssInfo->ucPrimaryChannel;
 }
 
@@ -5823,6 +5841,11 @@ uint32_t wlanGetBandIndexByNetwork(IN struct ADAPTER
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
 
+	if (prBssInfo == NULL) {
+		DBGLOG(INIT, ERROR,
+		"ucBssIndex= %d prBssInfo is Null\n", ucBssIndex);
+		return BAND_NUM;
+	}
 	return prBssInfo->eBand;
 }
 
@@ -6235,6 +6258,12 @@ void wlanDumpAllBssStatistics(IN struct ADAPTER *prAdapter)
 
 	for (ucIdx = 0; ucIdx < prAdapter->ucHwBssIdNum; ucIdx++) {
 		prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucIdx);
+
+		if (prBssInfo == NULL) {
+			DBGLOG(INIT, ERROR,
+			"ucIdx = %d prBssInfo is Null\n", ucIdx);
+			continue;
+		}
 		if (!IS_BSS_ACTIVE(prBssInfo)) {
 			DBGLOG(SW4, TRACE,
 			       "Invalid BssInfo index[%u], skip dump!\n",
@@ -7539,7 +7568,7 @@ void wlanInitFeatureOption(IN struct ADAPTER *prAdapter)
 	prWifiVar->ucStaBandwidth = (uint8_t) wlanCfgGetUint32(
 				prAdapter, "StaBw", MAX_BW_160MHZ);
 	prWifiVar->ucSta2gBandwidth = (uint8_t) wlanCfgGetUint32(
-				prAdapter, "Sta2gBw", MAX_BW_40MHZ);
+				prAdapter, "Sta2gBw", MAX_BW_20MHZ);
 	prWifiVar->ucSta5gBandwidth = (uint8_t) wlanCfgGetUint32(
 				prAdapter, "Sta5gBw", MAX_BW_160MHZ);
 	prWifiVar->ucSta6gBandwidth = (uint8_t) wlanCfgGetUint32(
@@ -7835,6 +7864,10 @@ void wlanInitFeatureOption(IN struct ADAPTER *prAdapter)
 					prAdapter, "DbdcMode",
 					ENUM_DBDC_MODE_DYNAMIC);
 #endif /*CFG_SUPPORT_DBDC*/
+	prWifiVar->ucCsaDeauthClient = (uint8_t) wlanCfgGetUint32(
+					prAdapter, "CsaDeauthClient",
+					FEATURE_ENABLED);
+
 #if (CFG_EFUSE_BUFFER_MODE_DELAY_CAL == 1)
 	prWifiVar->ucEfuseBufferModeCal = (uint8_t) wlanCfgGetUint32(
 					prAdapter, "EfuseBufferModeCal", 0);
@@ -8277,7 +8310,9 @@ void wlanInitFeatureOption(IN struct ADAPTER *prAdapter)
 		prAdapter, "CC2Region", FEATURE_ENABLED);
 
 	prWifiVar->u4ApChnlHoldTime = (uint32_t) wlanCfgGetUint32(
-		prAdapter, "ApChnlHoldTime", P2P_AP_CHNL_HOLD_TIME_MS);
+		prAdapter, "ApChnlHoldTime", SAP_CHNL_HOLD_TIME_MS);
+	prWifiVar->u4P2pChnlHoldTime = (uint32_t) wlanCfgGetUint32(
+		prAdapter, "P2pChnlHoldTime", P2P_CHNL_HOLD_TIME_MS);
 
 	prWifiVar->fgAllowSameBandDualSta = (uint8_t) wlanCfgGetUint32(
 		prAdapter, "AllowSameBandDualSta", FEATURE_ENABLED);
@@ -8325,6 +8360,8 @@ void wlanInitFeatureOption(IN struct ADAPTER *prAdapter)
 	prWifiVar->fgEnOnlyScan6g = (uint8_t) wlanCfgGetUint32(
 		prAdapter, "EnableOnlyScan6g", FEATURE_DISABLED);
 #endif /* CFG_SUPPORT_LIMITED_PKT_PID */
+	prWifiVar->fgUseOneTxRing = (uint8_t) wlanCfgGetUint32(
+		prAdapter, "UseOneTxRing", FEATURE_DISABLED);
 #if CFG_SUPPORT_802_11V_BTM_OFFLOAD
 	prWifiVar->fgAggressiveLoadBanalancing = (uint8_t) wlanCfgGetUint32(
 		prAdapter, "AggressiveLoadBanalancing", FEATURE_DISABLED);
@@ -9098,6 +9135,7 @@ textresume:
 					x++;
 					continue;
 				}
+				kal_fallthrough;
 			case '\n':
 				/* \ <lf> -> line continuation */
 				x++;
@@ -11581,6 +11619,11 @@ wlanGetSpeIdx(IN struct ADAPTER *prAdapter,
 		return ucRetValSpeIdx;
 	}
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
+	if (prBssInfo == NULL) {
+		DBGLOG(INIT, ERROR,
+		"ucBssIndex = %d prBssInfo is Null\n", ucBssIndex);
+		return ucRetValSpeIdx;
+	}
 	/*
 	 * if DBDC enable return 0, else depend 2.4G/5G & support WF path
 	 * retrun accurate value
@@ -11678,6 +11721,13 @@ wlanGetSupportNss(IN struct ADAPTER *prAdapter,
 #endif
 	prAisFsmInfo = aisGetAisFsmInfo(prAdapter, ucBssIndex);
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
+
+	if (prBssInfo == NULL) {
+		DBGLOG(INIT, ERROR,
+		"ucBssIndex = %d prBssInfo is Null\n", ucBssIndex);
+		return ucRetValNss;
+	}
+
 	if (IS_BSS_APGO(prBssInfo)) {
 		if (p2pFuncIsAPMode(
 			prAdapter->rWifiVar.prP2PConnSettings

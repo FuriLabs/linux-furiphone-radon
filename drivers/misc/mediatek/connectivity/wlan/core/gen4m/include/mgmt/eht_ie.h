@@ -27,7 +27,7 @@ struct _IE_EHT_CAP_T {
 	u_int8_t  ucExtId;
 	u_int8_t  ucEhtMacCap[EHT_MAC_CAP_BYTE_NUM];
 	u_int8_t  ucEhtPhyCap[EHT_PHY_CAP_BYTE_NUM];
-	u_int8_t  aucVarInfo[0];
+	u_int8_t  aucVarInfo[];
 } __KAL_ATTRIB_PACKED__;
 
 #define EHT_OP_BYTE_NUM (1)
@@ -37,7 +37,7 @@ struct _IE_EHT_OP_T {
 	u_int8_t  ucLength;
 	u_int8_t  ucExtId;
 	u_int8_t  ucEhtOpParams[EHT_OP_BYTE_NUM];
-	u_int8_t  aucVarInfo[0];
+	u_int8_t  aucVarInfo[];
 } __KAL_ATTRIB_PACKED__;
 
 

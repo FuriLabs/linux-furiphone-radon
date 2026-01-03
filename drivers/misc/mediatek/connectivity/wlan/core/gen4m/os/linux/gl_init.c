@@ -132,7 +132,9 @@ struct WLANDEV_INFO {
 
 MODULE_AUTHOR(NIC_AUTHOR);
 MODULE_DESCRIPTION(NIC_DESC);
+#if KERNEL_VERSION(5, 12, 0) > CFG80211_VERSION_CODE
 MODULE_SUPPORTED_DEVICE(NIC_NAME);
+#endif
 
 /* MODULE_LICENSE("MTK Propietary"); */
 MODULE_LICENSE("Dual BSD/GPL");
@@ -291,16 +293,30 @@ static struct ieee80211_channel mtk_2ghz_channels[] = {
 #endif
 
 #if (CFG_SUPPORT_WIFI_6G == 1)
-#define CHAN6G(_channel, _flags)				\
-{								\
-	.band               = KAL_BAND_6GHZ,			\
-	.center_freq        = (5950 + (5 * (_channel))),	\
-	.freq_offset        = 0,				\
-	.hw_value           = (_channel),			\
-	.flags              = (_flags),				\
-	.max_antenna_gain   = 0,				\
-	.max_power          = 30,				\
-}
+#if KERNEL_VERSION(5, 8, 0) <= CFG80211_VERSION_CODE
+	#define CHAN6G(_channel, _flags)				\
+	{								\
+		.band               = KAL_BAND_6GHZ,			\
+		.center_freq        =	\
+			((_channel == 2) ? (5935) : (5950 + (5 * (_channel)))),\
+		.freq_offset        = 0,				\
+		.hw_value           = (_channel),			\
+		.flags              = (_flags),				\
+		.max_antenna_gain   = 0,				\
+		.max_power          = 30,				\
+	}
+#else
+	#define CHAN6G(_channel, _flags)				\
+	{								\
+		.band               = KAL_BAND_6GHZ,			\
+		.center_freq        =	\
+			((_channel == 2) ? (5935) : (5950 + (5 * (_channel)))),\
+		.hw_value           = (_channel),			\
+		.flags              = (_flags),				\
+		.max_antenna_gain   = 0,				\
+		.max_power          = 30,				\
+	}
+#endif
 #endif
 
 static struct ieee80211_channel mtk_5ghz_channels[] = {
@@ -338,6 +354,7 @@ static struct ieee80211_channel mtk_5ghz_channels[] = {
 #if (CFG_SUPPORT_WIFI_6G == 1)
 static struct ieee80211_channel mtk_6ghz_channels[] = {
 	/* UNII-5 */
+	CHAN6G(2, 0),
 	CHAN6G(1, 0),
 	CHAN6G(5, 0),
 	CHAN6G(9, 0),
@@ -1776,6 +1793,14 @@ int wlanDoIOCTL(struct net_device *prDev,
 	return ret;
 }				/* end of wlanDoIOCTL() */
 
+#if KERNEL_VERSION(5, 15, 0) <= CFG80211_VERSION_CODE
+int wlanDoPrivIOCTL(struct net_device *prDev, struct ifreq *prIfReq,
+		void __user *prData, int i4Cmd)
+{
+	return wlanDoIOCTL(prDev, prIfReq, i4Cmd);
+}
+#endif
+
 /*----------------------------------------------------------------------------*/
 /*!
  * \brief Export wlan GLUE_INFO_T pointer to p2p module
@@ -1834,7 +1859,7 @@ static void wlanSetMulticastList(struct net_device *prDev)
 	DBGLOG(INIT, TRACE, "flags: 0x%x\n", prDev->flags);
 	prDev->flags |= (IFF_MULTICAST | IFF_ALLMULTI);
 	gPrDev = prDev;
-	queue_delayed_work(system_power_efficient_wq, &workq, 0);
+	schedule_delayed_work(&workq, 0);
 }
 
 /* FIXME: Since we cannot sleep in the wlanSetMulticastList, we arrange
@@ -2195,8 +2220,14 @@ static int wlanInit(struct net_device *prDev)
 		netdev_priv(prDev);
 	spin_lock_init(&prNetDevPrivate->napi_spinlock);
 	prNetDevPrivate->napi.dev = prDev;
+#if (KERNEL_VERSION(6, 1, 0) <= CFG80211_VERSION_CODE)
+	netif_napi_add(prNetDevPrivate->napi.dev,
+		&prNetDevPrivate->napi, kal_napi_poll);
+#else
 	netif_napi_add(prNetDevPrivate->napi.dev,
 		&prNetDevPrivate->napi, kal_napi_poll, 64);
+#endif
+
 	DBGLOG(INIT, INFO,
 		"GRO interface added successfully:%p\n", prDev);
 #endif
@@ -2235,6 +2266,10 @@ static int wlanSetMacAddress(struct net_device *ndev, void *addr)
 	struct GLUE_INFO *prGlueInfo = NULL;
 	struct sockaddr *sa = NULL;
 	struct BSS_INFO *prAisBssInfo = NULL;
+#if (KERNEL_VERSION(5, 16, 0) <= CFG80211_VERSION_CODE)
+	u8 _addr[MAC_ADDR_LEN];
+#endif
+
 
 	/**********************************************************************
 	 * Check if kernel passes valid data to us                            *
@@ -2266,7 +2301,13 @@ static int wlanSetMacAddress(struct net_device *ndev, void *addr)
 		wlanGetBssIdx(ndev));
 
 	COPY_MAC_ADDR(prAisBssInfo->aucOwnMacAddr, sa->sa_data);
-	COPY_MAC_ADDR(ndev->dev_addr, sa->sa_data);
+#if (KERNEL_VERSION(5, 16, 0) <= CFG80211_VERSION_CODE)
+		ether_addr_copy(_addr, sa->sa_data);
+		eth_hw_addr_set(ndev, _addr);
+#else
+		COPY_MAC_ADDR(ndev->dev_addr, sa->sa_data);
+#endif
+
 	DBGLOG(INIT, INFO,
 		"[wlan%d] Set connect random macaddr to " MACSTR ".\n",
 		prAisBssInfo->ucBssIndex,
@@ -2762,6 +2803,9 @@ static const struct net_device_ops wlan_netdev_ops = {
 	.ndo_set_rx_mode = wlanSetMulticastList,
 	.ndo_get_stats = wlanGetStats,
 	.ndo_do_ioctl = wlanDoIOCTL,
+#if KERNEL_VERSION(5, 15, 0) <= CFG80211_VERSION_CODE
+	.ndo_siocdevprivate = wlanDoPrivIOCTL,
+#endif
 	.ndo_start_xmit = wlanHardStartXmit,
 	.ndo_init = wlanInit,
 	.ndo_uninit = wlanUninit,
@@ -3752,9 +3796,10 @@ void reset_p2p_mode(struct GLUE_INFO *prGlueInfo)
 			sizeof(struct PARAM_CUSTOM_P2P_SET_STRUCT),
 			FALSE, FALSE, TRUE, &u4BufLen);
 
-	if (rWlanStatus != WLAN_STATUS_SUCCESS)
+	if (rWlanStatus != WLAN_STATUS_SUCCESS) {
+		DBGLOG(INIT, ERROR, "set p2p mode failed\n");
 		p2pRemove(prGlueInfo);
-
+	}
 	DBGLOG(INIT, INFO,
 			"ret = 0x%08x\n", (uint32_t) rWlanStatus);
 }
@@ -4754,6 +4799,9 @@ void wlanOnPreAdapterStart(struct GLUE_INFO *prGlueInfo,
 	wlanGetConfig(prAdapter);
 #endif
 
+	/* Initialize Feature Options */
+	wlanInitFeatureOption(prAdapter);
+
 	/* Init Chip Capability */
 	*pprChipInfo = prAdapter->chip_info;
 	if ((*pprChipInfo)->asicCapInit)
@@ -4969,6 +5017,9 @@ static int32_t wlanOnPreNetRegister(struct GLUE_INFO *prGlueInfo,
 		struct sockaddr MacAddr = {0};
 		uint32_t u4SetInfoLen = 0;
 		struct net_device *prDevHandler;
+#if (KERNEL_VERSION(5, 16, 0) <= CFG80211_VERSION_CODE)
+		u8 addr[ETH_ALEN];
+#endif
 
 		rStatus = kalIoctl(prGlueInfo, wlanoidQueryCurrentAddr,
 				&MacAddr.sa_data, PARAM_MAC_ADDR_LEN,
@@ -4978,8 +5029,13 @@ static int32_t wlanOnPreNetRegister(struct GLUE_INFO *prGlueInfo,
 			DBGLOG(INIT, WARN, "set MAC addr fail 0x%x\n",
 							rStatus);
 		} else {
+#if (KERNEL_VERSION(5, 16, 0) <= CFG80211_VERSION_CODE)
+			ether_addr_copy(addr, MacAddr.sa_data);
+			eth_hw_addr_set(prGlueInfo->prDevHandler, addr);
+#else
 			kalMemCopy(prGlueInfo->prDevHandler->dev_addr,
 					&MacAddr.sa_data, ETH_ALEN);
+#endif
 			kalMemCopy(prGlueInfo->prDevHandler->perm_addr,
 					prGlueInfo->prDevHandler->dev_addr,
 					ETH_ALEN);
@@ -4994,9 +5050,16 @@ static int32_t wlanOnPreNetRegister(struct GLUE_INFO *prGlueInfo,
 		if (KAL_AIS_NUM > 1) {
 			prDevHandler = wlanGetNetDev(prGlueInfo, 1);
 			if (prDevHandler) {
+#if (KERNEL_VERSION(5, 16, 0) <= CFG80211_VERSION_CODE)
+				kalMemCopy(addr,
+					&prAdapter->rWifiVar.aucMacAddress1,
+					ETH_ALEN);
+				eth_hw_addr_set(prDevHandler, addr);
+#else
 				kalMemCopy(prDevHandler->dev_addr,
 					&prAdapter->rWifiVar.aucMacAddress1,
 					ETH_ALEN);
+#endif
 				kalMemCopy(prDevHandler->perm_addr,
 					prDevHandler->dev_addr,
 					ETH_ALEN);
@@ -5892,10 +5955,12 @@ static int32_t wlanProbe(void *pvData, void *pvDriverData)
 		case FAIL_BY_RESET:
 		case FAIL_MET_INIT_PROCFS:
 			kalMetRemoveProcfs();
+			kal_fallthrough;
 		case PROC_INIT_FAIL:
 			wlanNetUnregister(prWdev);
 			/* Unregister notifier callback */
 			wlanUnregisterInetAddrNotifier();
+			kal_fallthrough;
 		case NET_REGISTER_FAIL:
 			set_bit(GLUE_FLAG_HALT_BIT, &prGlueInfo->ulFlag);
 #if CFG_SUPPORT_MULTITHREAD
@@ -5912,7 +5977,7 @@ static int32_t wlanProbe(void *pvData, void *pvDriverData)
 			wait_for_completion_interruptible(
 							&prGlueInfo->rHaltComp);
 			wlanAdapterStop(prAdapter, FALSE);
-		/* fallthrough */
+			kal_fallthrough;
 		case ADAPTER_START_FAIL:
 			/*reset NVRAM State to ready for the next wifi-no*/
 			if (g_NvramFsm == NVRAM_STATE_SEND_TO_FW)
@@ -5920,7 +5985,7 @@ static int32_t wlanProbe(void *pvData, void *pvDriverData)
 			glBusFreeIrq(prWdev->netdev,
 				*((struct GLUE_INFO **)
 						netdev_priv(prWdev->netdev)));
-		/* fallthrough */
+			kal_fallthrough;
 		case BUS_SET_IRQ_FAIL:
 			wlanWakeLockUninit(prGlueInfo);
 			wlanNetDestroy(prWdev);

@@ -1250,6 +1250,10 @@ u_int8_t rsnPerformPolicySelection(
 			DBGLOG(RSN, TRACE,
 			       "[MFP] Skip RSN IE, No MFP Required Capability.\n");
 			return FALSE;
+		} else if (!(prBssRsnInfo->u2RsnCap & ELEM_WPA_CAP_MFPC)) {
+			DBGLOG(RSN, WARN,
+			       "[MFP] Skip RSN IE, No MFP Required\n");
+			return FALSE;
 		}
 		aisGetAisSpecBssInfo(prAdapter, ucBssIndex)
 			->fgMgmtProtection = TRUE;
@@ -1442,11 +1446,24 @@ uint32_t _addWPAIE_impl(IN struct ADAPTER *prAdapter,
 	ucBssIndex = prMsduInfo->ucBssIndex;
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, ucBssIndex);
 
+	if (!prAdapter->rWifiVar.fgReuseRSNIE)
+		return FALSE;
+
 	if (!prBssInfo)
 		return FALSE;
 
 	/* AP + GO */
 	if (!IS_BSS_APGO(prBssInfo))
+		return FALSE;
+
+	/* AP only */
+	if (!p2pFuncIsAPMode(
+		prAdapter->rWifiVar.
+		prP2PConnSettings[prBssInfo->u4PrivateData]))
+		return FALSE;
+
+	/* PMF only */
+	if (!prBssInfo->rApPmfCfg.fgMfpc)
 		return FALSE;
 
 	prP2pSpecBssInfo =
@@ -1783,18 +1800,6 @@ void rsnGenerateRSNIE(IN struct ADAPTER *prAdapter,
 
 			RSN_IE(pucBuffer)->ucLength +=
 				(prP2pSpecBssInfo->u4KeyMgtSuiteCount - 1) * 4;
-		} else if (prBssInfo->eNetworkType == NETWORK_TYPE_P2P) {
-			WLAN_SET_FIELD_16(cp, 2);	/* AKM suite count */
-			cp += 2;
-			/* AKM suite */
-			WLAN_SET_FIELD_32(cp, GET_BSS_INFO_BY_INDEX(prAdapter,
-			    ucBssIndex)->u4RsnSelectedAKMSuite);
-			cp += 4;
-			/* jesus hack: add PSK SHA256 that networkmanager insists on using.
-			   we really should just use the IE provided by wpa_supplicant... */
-			RSN_IE(pucBuffer)->ucLength += 4;
-			WLAN_SET_FIELD_32(cp, RSN_AKM_SUITE_PSK_SHA256);
-			cp += 4;
 		} else {
 			WLAN_SET_FIELD_16(cp, 1);	/* AKM suite count */
 			cp += 2;
@@ -1853,7 +1858,15 @@ void rsnGenerateRSNIE(IN struct ADAPTER *prAdapter,
 			} else  {
 				entry = rsnSearchPmkidEntry(prAdapter,
 					prStaRec->aucMacAddr, ucBssIndex);
+
+				if (prStaRec->ucAuthAlgNum ==
+						AUTH_ALGORITHM_NUM_SAE) {
+					DBGLOG(RSN, INFO,
+						"Do not apply PMKID in RSNIE if auth type is SAE");
+					entry = NULL;
+				}
 			}
+
 			/* Fill PMKID Count and List field */
 			if (entry) {
 				uint8_t *pmk = entry->rBssidInfo.arPMKID;
@@ -2051,6 +2064,11 @@ void rsnParserCheckForRSNCCMPPSK(struct ADAPTER *prAdapter,
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter,
 					  prStaRec->ucBssIndex);
+	if (prBssInfo == NULL) {
+		DBGLOG(RSN, WARN, "prBssInfo is %d NULL\n",
+			prStaRec->ucBssIndex);
+		return;
+	}
 	*pu2StatusCode = STATUS_CODE_INVALID_INFO_ELEMENT;
 	kalMemZero(&rRsnIe, sizeof(struct RSN_INFO));
 
@@ -2080,8 +2098,6 @@ void rsnParserCheckForRSNCCMPPSK(struct ADAPTER *prAdapter,
 			&& (rRsnIe.au4AuthKeyMgtSuite[0] != RSN_AKM_SUITE_SAE)
 #endif
 			&& (rRsnIe.au4AuthKeyMgtSuite[0] != RSN_AKM_SUITE_OWE)
-			// jesus hack: allow "invalid AKMP" if peer did fallback to PSK_SHA256
-			&& (rRsnIe.au4AuthKeyMgtSuite[0] != RSN_AKM_SUITE_PSK_SHA256)
 			)) {
 			DBGLOG(RSN, WARN, "RSN with invalid AKMP\n");
 			*pu2StatusCode = STATUS_CODE_INVALID_AKMP;
@@ -2323,6 +2339,12 @@ struct PMKID_ENTRY *rsnSearchPmkidEntry(IN struct ADAPTER *prAdapter,
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter,
 		ucBssIndex);
+
+	if (prBssInfo == NULL) {
+		DBGLOG(RSN, ERROR, "prBssInfo [%d] is null!\n",
+			ucBssIndex);
+		return NULL;
+	}
 	cache = &prBssInfo->rPmkidCache;
 
 	LINK_FOR_EACH_ENTRY(entry, cache, rLinkEntry, struct PMKID_ENTRY) {
@@ -2406,7 +2428,12 @@ uint32_t rsnSetPmkid(IN struct ADAPTER *prAdapter,
 
 	prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter,
 		prPmkid->ucBssIdx);
-	cache = &prBssInfo->rPmkidCache;
+	if (prBssInfo == NULL) {
+		DBGLOG(RSN, ERROR, "prBssInfo is %d null\n",
+			prPmkid->ucBssIdx);
+		return WLAN_STATUS_FAILURE;
+	}
+		cache = &prBssInfo->rPmkidCache;
 
 	entry = rsnSearchPmkidEntry(prAdapter, prPmkid->arBSSID,
 		prPmkid->ucBssIdx);
@@ -3163,7 +3190,11 @@ void rsnGenerateWSCIEForAssocRsp(struct ADAPTER *prAdapter,
 
 	DBGLOG(RSN, TRACE, "WPS: Building WPS IE for (Re)Association Response");
 	prP2pBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter, prMsduInfo->ucBssIndex);
-
+	if (prP2pBssInfo == NULL) {
+		DBGLOG(RSN, ERROR, "prP2pBssInfo is %d Null\n",
+			prMsduInfo->ucBssIndex);
+		return;
+	}
 	if (prP2pBssInfo->eNetworkType != NETWORK_TYPE_P2P)
 		return;
 
@@ -3316,6 +3347,12 @@ uint8_t rsnApCheckSaQueryTimeout(IN struct ADAPTER
 
 		prBssInfo = GET_BSS_INFO_BY_INDEX(prAdapter,
 						  prStaRec->ucBssIndex);
+
+		if (prBssInfo == NULL) {
+			DBGLOG(RSN, INFO, "prBssInfo is %d NULL\n",
+				prStaRec->ucBssIndex);
+			return 0;
+		}
 
 		/* refer to p2pRoleFsmRunEventRxDeauthentication */
 		if (prBssInfo->eCurrentOPMode == OP_MODE_ACCESS_POINT) {

@@ -229,7 +229,9 @@
 /* HE PHY Capablilites byte9 */
 #define HE_PHY_CAP9_LT_16_SIGB_OFDM_SYMBOL_SHFT        0
 #define HE_PHY_CAP9_NON_TRIGGER_CQI_FB_SHFT            1
+#define HE_PHY_CAP9_TX_1024_QAM_LESS_242_RU            BIT(2)
 #define HE_PHY_CAP9_TX_1024_QAM_LESS_242_RU_SHFT       2
+#define HE_PHY_CAP9_RX_1024_QAM_LESS_242_RU            BIT(3)
 #define HE_PHY_CAP9_RX_1024_QAM_LESS_242_RU_SHFT       3
 #define HE_PHY_CAP9_RX_FULL_BW_COMPRESS_SIGB_SHFT      4
 #define HE_PHY_CAP9_RX_FULL_BW_NONCOMPRESS_SIGB_SHFT   5
@@ -624,6 +626,12 @@ enum ENUM_HEBA_TYPE {
 	((_aucHePhyCapInfo[8] & HE_PHY_CAP8_ER_SU_PPDU_1X_HE_LTF) \
 		>> HE_PHY_CAP8_ER_SU_PPDU_1X_HE_LTF_SHFT)
 
+#define HE_SET_PHY_CAP_TX_1KQAM_242_TONE_RU(_aucHePhyCapInfo) \
+	(_aucHePhyCapInfo[9] |= HE_PHY_CAP9_TX_1024_QAM_LESS_242_RU)
+
+#define HE_SET_PHY_CAP_RX_1KQAM_242_TONE_RU(_aucHePhyCapInfo) \
+	(_aucHePhyCapInfo[9] |= HE_PHY_CAP9_RX_1024_QAM_LESS_242_RU)
+
 /* should use macro to access field of HE OP*/
 #define HE_IS_VHT_OP_INFO_PRESENT(_aucHeOpParams) \
 	((_aucHeOpParams[1] & HE_OP_PARAM1_VHT_OP_INFO_PRESENT) \
@@ -763,7 +771,7 @@ struct _IE_HE_CAP_T {
 	u_int8_t  ucExtId;
 	u_int8_t  ucHeMacCap[HE_MAC_CAP_BYTE_NUM]; /* BIT0 ~ BIT47 */
 	u_int8_t  ucHePhyCap[HE_PHY_CAP_BYTE_NUM]; /* BIT0 ~ BIT87 */
-	u_int8_t  aucVarInfo[0];
+	u_int8_t  aucVarInfo[];
 } __KAL_ATTRIB_PACKED__;
 
 struct _IE_HE_OP_T {
@@ -773,7 +781,7 @@ struct _IE_HE_OP_T {
 	u_int8_t  ucHeOpParams[HE_OP_BYTE_NUM];
 	u_int8_t  ucBssColorInfo;
 	u_int16_t u2HeBasicMcsSet;
-	u_int8_t  aucVarInfo[0];
+	u_int8_t  aucVarInfo[];
 } __KAL_ATTRIB_PACKED__;
 
 #if (CFG_SUPPORT_WIFI_6G == 1)
