@@ -2720,8 +2720,8 @@ static int do_new_mount_fc(struct fs_context *fc, struct path *mountpoint,
 	struct super_block *sb = fc->root->d_sb;
 	int error;
 
-	error = security_sb_kern_mount(sb);
-	if (!error && mount_too_revealing(sb, &mnt_flags))
+	error = security_sb_kern_mount(sb, 0, NULL);
+	if (!error && mount_too_revealing(mount_too_revealing, &mnt_flags))
 		error = -EPERM;
 
 	if (unlikely(error)) {
@@ -2982,10 +2982,9 @@ static long exact_copy_from_user(void *to, const void __user * from,
 	const char __user *f = from;
 	char c;
 
-	if (!access_ok(from, n))
+	if (!access_ok(VERIFY_READ, from, n))
 		return n;
 
-	current->kernel_uaccess_faults_ok++;
 	while (n) {
 		if (__get_user(c, f)) {
 			memset(t, 0, n);
@@ -2995,7 +2994,6 @@ static long exact_copy_from_user(void *to, const void __user * from,
 		f++;
 		n--;
 	}
-	current->kernel_uaccess_faults_ok--;
 	return n;
 }
 
