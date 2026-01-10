@@ -168,7 +168,7 @@ static int vfs_fsconfig_locked(struct fs_context *fc, int cmd,
 		if (ret)
 			break;
 		sb = fc->root->d_sb;
-		ret = security_sb_kern_mount(sb);
+		ret = security_sb_kern_mount(sb, 0, NULL);
 		if (unlikely(ret)) {
 			fc_drop_locked(fc);
 			break;
