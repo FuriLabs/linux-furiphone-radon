@@ -53,6 +53,7 @@ struct msg_msg;
 struct xattr;
 struct xfrm_sec_ctx;
 struct mm_struct;
+struct fs_parameter;
 
 /* Default (no) options for the capable function */
 #define CAP_OPT_NONE 0x0
