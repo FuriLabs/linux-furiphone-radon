@@ -42,6 +42,8 @@
 #include <asm/byteorder.h>
 #include <uapi/linux/fs.h>
 
+#include <linux/fs_compat.h>
+
 struct backing_dev_info;
 struct bdi_writeback;
 struct bio;
@@ -167,6 +169,8 @@ typedef int (dio_iodone_t)(struct kiocb *iocb, loff_t offset,
 
 /* File does not contribute to nr_files count */
 #define FMODE_NOACCOUNT		((__force fmode_t)0x20000000)
+
+#define FMODE_STREAM            ((__force fmode_t)0x200000)
 
 /*
  * Flag for rw_copy_check_uvector and compat_rw_copy_check_uvector
@@ -624,6 +628,10 @@ struct inode {
 
 #ifdef CONFIG_SECURITY
 	void			*i_security;
+#endif
+
+#ifdef CONFIG_FUTEX
+	atomic64_t        i_sequence;
 #endif
 
 	/* Stat data, not accessed from path walking */
