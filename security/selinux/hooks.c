@@ -151,6 +151,10 @@ static int __init checkreqprot_setup(char *str)
 }
 __setup("checkreqprot=", checkreqprot_setup);
 
+struct selinux_mnt_opts {
+        const char *fscontext, *context, *rootcontext, *defcontext;
+};
+
 static struct kmem_cache *sel_inode_cache;
 static struct kmem_cache *file_security_cache;
 
@@ -3050,7 +3054,7 @@ static const struct fs_parameter_spec selinux_param_specs[] = {
 	fsparam_string(DEFCONTEXT_STR,	Opt_defcontext),
 	fsparam_string(FSCONTEXT_STR,	Opt_fscontext),
 	fsparam_string(ROOTCONTEXT_STR,	Opt_rootcontext),
-	fsparam_flag  (SECLABEL_STR,	Opt_seclabel),
+	fsparam_flag  (SECLABEL_STR,	Opt_labelsupport),
 	{}
 };
 

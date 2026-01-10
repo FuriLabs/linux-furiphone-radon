@@ -64,6 +64,7 @@
 #define ROOTCONTEXT_STR	"rootcontext="
 #define DEFCONTEXT_STR	"defcontext="
 #define LABELSUPP_STR "seclabel"
+#define SECLABEL_STR "seclabel"
 
 struct netlbl_lsm_secattr;
 
