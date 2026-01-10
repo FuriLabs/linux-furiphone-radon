@@ -965,6 +965,8 @@ static inline struct file *get_file(struct file *f)
 	atomic_long_inc(&f->f_count);
 	return f;
 }
+#define get_file_rcu_many(x, cnt)	\
+	atomic_long_add_unless(&(x)->f_count, (cnt), 0)
 #define get_file_rcu(x) atomic_long_inc_not_zero(&(x)->f_count)
 #define fput_atomic(x)	atomic_long_add_unless(&(x)->f_count, -1, 1)
 #define file_count(x)	atomic_long_read(&(x)->f_count)
@@ -1811,6 +1813,13 @@ struct file_operations {
 #ifndef CONFIG_MMU
 	unsigned (*mmap_capabilities)(struct file *);
 #endif
+	int (*clone_file_range)(struct file *file_in, loff_t pos_in,
+				struct file *file_out, loff_t pos_out,
+				u64 len);
+
+	int (*dedupe_file_range)(struct file *src_file, loff_t src_pos,
+				 struct file *dst_file, loff_t dst_pos,
+				 u64 len);
 	ssize_t (*copy_file_range)(struct file *, loff_t, struct file *,
 			loff_t, size_t, unsigned int);
 	loff_t (*remap_file_range)(struct file *file_in, loff_t pos_in,
@@ -1823,6 +1832,7 @@ struct inode_operations {
 	struct dentry * (*lookup) (struct inode *,struct dentry *, unsigned int);
 	const char * (*get_link) (struct dentry *, struct inode *, struct delayed_call *);
 	int (*permission) (struct inode *, int);
+	int (*permission2) (struct vfsmount *, struct inode *, int);
 	struct posix_acl * (*get_acl)(struct inode *, int);
 
 	int (*readlink) (struct dentry *, char __user *,int);
@@ -1836,6 +1846,7 @@ struct inode_operations {
 	int (*mknod) (struct inode *,struct dentry *,umode_t,dev_t);
 	int (*rename) (struct inode *, struct dentry *,
 			struct inode *, struct dentry *, unsigned int);
+	int (*setattr2) (struct vfsmount *, struct dentry *, struct iattr *);
 	int (*setattr) (struct dentry *, struct iattr *);
 	int (*getattr) (const struct path *, struct kstat *, u32, unsigned int);
 	ssize_t (*listxattr) (struct dentry *, char *, size_t);
@@ -1882,18 +1893,19 @@ extern int generic_remap_file_range_prep(struct file *file_in, loff_t pos_in,
 					 struct file *file_out, loff_t pos_out,
 					 loff_t *count,
 					 unsigned int remap_flags);
-extern loff_t do_clone_file_range(struct file *file_in, loff_t pos_in,
-				  struct file *file_out, loff_t pos_out,
-				  loff_t len, unsigned int remap_flags);
-extern loff_t vfs_clone_file_range(struct file *file_in, loff_t pos_in,
-				   struct file *file_out, loff_t pos_out,
-				   loff_t len, unsigned int remap_flags);
-extern int vfs_dedupe_file_range(struct file *file,
-				 struct file_dedupe_range *same);
-extern loff_t vfs_dedupe_file_range_one(struct file *src_file, loff_t src_pos,
-					struct file *dst_file, loff_t dst_pos,
-					loff_t len, unsigned int remap_flags);
-
+extern int do_clone_file_range(struct file *file_in, loff_t pos_in,
+			       struct file *file_out, loff_t pos_out,
+			       u64 len);
+extern int vfs_clone_file_range(struct file *file_in, loff_t pos_in,
+				struct file *file_out, loff_t pos_out,
+				u64 len);
+extern int vfs_dedupe_file_range(struct file *file, struct file_dedupe_range *same);
+extern int vfs_dedupe_file_range_compare(struct inode *src, loff_t srcoff,
+                                  struct inode *dest, loff_t destoff,
+                                  loff_t len, bool *is_same);
+extern int vfs_dedupe_file_range_one(struct file *src_file, loff_t src_pos,
+				     struct file *dst_file, loff_t dst_pos,
+				     u64 len);
 
 struct super_operations {
    	struct inode *(*alloc_inode)(struct super_block *sb);
