@@ -89,6 +89,8 @@
 #include <linux/shm.h>
 #include <linux/bpf.h>
 #include <uapi/linux/mount.h>
+#include <linux/fs_context.h>
+#include <linux/fs_parser.h>
 
 #include "avc.h"
 #include "objsec.h"
