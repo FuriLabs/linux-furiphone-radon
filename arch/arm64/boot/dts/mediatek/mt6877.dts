@@ -30,7 +30,7 @@
 
 	/* chosen */
 	chosen: chosen {
-		bootargs = "console=ttyS0,921600n1 root=/dev/ram vmalloc=400M swiotlb=noforce firmware_class.path=/vendor/firmware";
+		bootargs = "console=ttyS0,921600n1 console=ttyUSB0,115200n8 console=ttyUSB1,115200n8 console=ttyUSB2,115200n8 console=ttyUSB3,115200n8 root=/dev/ram vmalloc=400M swiotlb=noforce firmware_class.path=/vendor/firmware";
 		kaslr-seed = <0 0>;
 	};
 
