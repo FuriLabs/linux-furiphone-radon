@@ -82,7 +82,7 @@ static int usb_console_setup(struct console *co, char *options)
 	
 	/* Sane default */
 	if (baud == 0)
-		baud = 9600;
+		baud = 115200;
 
 	switch (bits) {
 	case 7:
