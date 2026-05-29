@@ -30,7 +30,8 @@
 
 	/* chosen */
 	chosen: chosen {
-		bootargs = "console=ttyS0,921600n1 root=/dev/ram vmalloc=400M swiotlb=noforce firmware_class.path=/vendor/firmware";
+		stdout-path = "serial0:921600n1";
+		bootargs = "console=ttyS0,921600n1 earlycon=uart8250,mmio32,0x11002000 loglevel=8 ignore_loglevel initcall_debug root=/dev/ram vmalloc=400M swiotlb=noforce firmware_class.path=/vendor/firmware";
 		kaslr-seed = <0 0>;
 	};
 
