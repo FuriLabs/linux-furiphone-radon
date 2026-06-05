@@ -17,10 +17,7 @@
 #include <linux/fscrypt.h>
 #endif
 
-/* Use of MS_* flags within the kernel is restricted to core mount(2) code. */
-#if !defined(__KERNEL__)
 #include <linux/mount.h>
-#endif
 
 /*
  * It's silly to have NR_OPEN bigger than NR_FILE, but you can change
