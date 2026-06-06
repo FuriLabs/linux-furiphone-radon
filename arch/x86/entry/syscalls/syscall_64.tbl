@@ -346,6 +346,7 @@
 424	common	pidfd_send_signal	__x64_sys_pidfd_send_signal
 434	common	pidfd_open		__x64_sys_pidfd_open
 435	common	clone3			__x64_sys_clone3/ptregs
+436	common	close_range		__x64_sys_close_range
 
 #
 # x32-specific system call numbers start at 512 to avoid cache impact
