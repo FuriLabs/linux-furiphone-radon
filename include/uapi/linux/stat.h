@@ -153,8 +153,17 @@ struct statx {
 #define STATX_BASIC_STATS	0x000007ffU	/* The stuff in the normal stat struct */
 #define STATX_BTIME		0x00000800U	/* Want/got stx_btime */
 #define STATX_MNT_ID		0x00001000U	/* Got stx_mnt_id */
-#define STATX_ALL		0x00000fffU	/* All currently supported flags */
+
 #define STATX__RESERVED		0x80000000U	/* Reserved for future struct statx expansion */
+
+#ifndef __KERNEL__
+/*
+ * This is deprecated, and shall remain the same value in the future.  To avoid
+ * confusion please use the equivalent (STATX_BASIC_STATS | STATX_BTIME)
+ * instead.
+ */
+#define STATX_ALL		0x00000fffU
+#endif
 
 /*
  * Attributes to be found in stx_attributes and masked in stx_attributes_mask.
