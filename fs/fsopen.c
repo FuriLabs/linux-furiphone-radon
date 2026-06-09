@@ -131,10 +131,6 @@ SYSCALL_DEFINE3(fspick, int, dfd, const char __user *, path, unsigned int, flags
 
 	fc->phase = FS_CONTEXT_RECONF_PARAMS;
 
-	ret = fscontext_alloc_log(fc);
-	if (ret < 0)
-		goto err_fc;
-
 	path_put(&target);
 	return fscontext_create_fd(fc, flags & FSPICK_CLOEXEC ? O_CLOEXEC : 0);
 
@@ -168,7 +164,7 @@ static int vfs_fsconfig_locked(struct fs_context *fc, int cmd,
 		if (ret)
 			break;
 		sb = fc->root->d_sb;
-		ret = security_sb_kern_mount(sb);
+		ret = security_sb_kern_mount(sb, 0, NULL);
 		if (unlikely(ret)) {
 			fc_drop_locked(fc);
 			break;
