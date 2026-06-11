@@ -353,6 +353,7 @@
 434	common	pidfd_open		__x64_sys_pidfd_open
 435	common	clone3			__x64_sys_clone3/ptregs
 436	common	close_range		__x64_sys_close_range
+438	common	pidfd_getfd		__x64_sys_pidfd_getfd
 439	common	faccessat2		__x64_sys_faccessat2
 442	common	mount_setattr		__x64_sys_mount_setattr
 
