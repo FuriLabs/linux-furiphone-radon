@@ -42,12 +42,13 @@ static int proc_set_super(struct super_block *sb, void *data)
 }
 
 enum {
-	Opt_gid, Opt_hidepid, Opt_err,
+	Opt_gid, Opt_hidepid, Opt_subset, Opt_err,
 };
 
 static const match_table_t tokens = {
 	{Opt_hidepid, "hidepid=%s"},
 	{Opt_gid, "gid=%u"},
+	{Opt_subset, "subset=%s"},
 	{Opt_err, NULL},
 };
 
@@ -89,6 +90,32 @@ static int proc_parse_hidepid_param(char *value, struct pid_namespace *pid)
 	return 0;
 }
 
+static int proc_parse_subset_param(char *value, struct pid_namespace *pid)
+{
+	if (!value)
+		return -EINVAL;
+
+	while (value) {
+		char *ptr = strchr(value, ',');
+
+		if (ptr)
+			*ptr++ = '\0';
+
+		if (*value != '\0') {
+			if (!strcmp(value, "pid"))
+				pid->pidonly = PROC_PIDONLY_ON;
+			else {
+				pr_err("proc: unsupported subset option - %s\n", value);
+				return -EINVAL;
+			}
+		}
+
+		value = ptr;
+	}
+
+	return 0;
+}
+
 static int proc_parse_options(char *options, struct pid_namespace *pid)
 {
 	char *p;
@@ -113,6 +140,10 @@ static int proc_parse_options(char *options, struct pid_namespace *pid)
 			break;
 		case Opt_hidepid:
 			if (proc_parse_hidepid_param(args[0].from, pid))
+				return 0;
+			break;
+		case Opt_subset:
+			if (proc_parse_subset_param(args[0].from, pid))
 				return 0;
 			break;
 		default:

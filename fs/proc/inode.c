@@ -137,6 +137,8 @@ static int proc_show_options(struct seq_file *seq, struct dentry *root)
 		seq_printf(seq, ",gid=%u", from_kgid_munged(&init_user_ns, pid->pid_gid));
 	if (pid->hide_pid != HIDEPID_OFF)
 		seq_printf(seq, ",hidepid=%s", hidepid2str(pid->hide_pid));
+	if (pid->pidonly != PROC_PIDONLY_OFF)
+		seq_printf(seq, ",subset=pid");
 
 	return 0;
 }
@@ -351,11 +353,15 @@ proc_reg_get_unmapped_area(struct file *file, unsigned long orig_addr,
 
 static int proc_reg_open(struct inode *inode, struct file *file)
 {
+	struct pid_namespace *pid = inode->i_sb->s_fs_info;
 	struct proc_dir_entry *pde = PDE(inode);
 	int rv = 0;
 	int (*open)(struct inode *, struct file *);
 	int (*release)(struct inode *, struct file *);
 	struct pde_opener *pdeo;
+
+	if (pid->pidonly == PROC_PIDONLY_ON)
+		return -ENOENT;
 
 	/*
 	 * Ensure that
