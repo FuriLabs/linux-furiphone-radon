@@ -23,6 +23,12 @@ enum { /* definitions for pid_namespace's hide_pid field */
 	HIDEPID_INVISIBLE = 2,
 };
 
+/* definitions for proc mount option pidonly */
+enum {
+	PROC_PIDONLY_OFF = 0,
+	PROC_PIDONLY_ON  = 1,
+};
+
 struct pid_namespace {
 	struct kref kref;
 	struct idr idr;
@@ -45,6 +51,7 @@ struct pid_namespace {
 	struct work_struct proc_work;
 	kgid_t pid_gid;
 	int hide_pid;
+	int pidonly;
 	int reboot;	/* group exit code if this pidns was rebooted */
 	struct ns_common ns;
 } __randomize_layout;
