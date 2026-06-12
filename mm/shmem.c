@@ -3504,7 +3504,12 @@ static int shmem_remount_fs(struct super_block *sb, int *flags, char *data)
 		goto out;
 	if (config.max_inodes && !sbinfo->max_inodes)
 		goto out;
-	if (config.noswap != sbinfo->noswap)
+
+	/*
+	 * "noswap" doesn't use fsparam_flag_no, i.e. there's no "swap"
+	 * counterpart for (re-)enabling swap.
+	 */
+	if (config.noswap && !sbinfo->noswap)
 		goto out;
 
 	error = 0;
