@@ -1288,6 +1288,7 @@ out:
 static int shmem_writepage(struct page *page, struct writeback_control *wbc)
 {
 	struct shmem_inode_info *info;
+	struct shmem_sb_info *sbinfo;
 	struct address_space *mapping;
 	struct inode *inode;
 	swp_entry_t swap;
@@ -1299,7 +1300,8 @@ static int shmem_writepage(struct page *page, struct writeback_control *wbc)
 	index = page->index;
 	inode = mapping->host;
 	info = SHMEM_I(inode);
-	if (info->flags & VM_LOCKED)
+	sbinfo = SHMEM_SB(inode->i_sb);
+	if ((info->flags & VM_LOCKED) || sbinfo->noswap)
 		goto redirty;
 	if (!total_swap_pages)
 		goto redirty;
@@ -2230,6 +2232,8 @@ static struct inode *shmem_get_inode(struct super_block *sb, const struct inode 
 		info->flags = flags & VM_NORESERVE;
 		INIT_LIST_HEAD(&info->shrinklist);
 		INIT_LIST_HEAD(&info->swaplist);
+		if (sbinfo->noswap)
+			mapping_set_unevictable(inode->i_mapping);
 		simple_xattrs_init(&info->xattrs);
 		cache_no_acl(inode);
 
@@ -3359,6 +3363,7 @@ static int shmem_parse_options(char *options, struct shmem_sb_info *sbinfo,
 	struct mempolicy *mpol = NULL;
 	uid_t uid;
 	gid_t gid;
+	bool noswap = false;
 
 	while (options != NULL) {
 		this_char = options;
@@ -3382,6 +3387,11 @@ static int shmem_parse_options(char *options, struct shmem_sb_info *sbinfo,
 		if ((value = strchr(this_char,'=')) != NULL) {
 			*value++ = 0;
 		} else {
+			if (!strcmp(this_char, "noswap")) {
+				noswap = true;
+				continue;
+			}
+
 			pr_err("tmpfs: No value for mount option '%s'\n",
 			       this_char);
 			goto error;
@@ -3456,6 +3466,7 @@ static int shmem_parse_options(char *options, struct shmem_sb_info *sbinfo,
 		}
 	}
 	sbinfo->mpol = mpol;
+	sbinfo->noswap = noswap;
 	return 0;
 
 bad_val:
@@ -3493,6 +3504,8 @@ static int shmem_remount_fs(struct super_block *sb, int *flags, char *data)
 		goto out;
 	if (config.max_inodes && !sbinfo->max_inodes)
 		goto out;
+	if (config.noswap != sbinfo->noswap)
+		goto out;
 
 	error = 0;
 	sbinfo->huge = config.huge;
@@ -3507,6 +3520,9 @@ static int shmem_remount_fs(struct super_block *sb, int *flags, char *data)
 		mpol_put(sbinfo->mpol);
 		sbinfo->mpol = config.mpol;	/* transfers initial ref */
 	}
+
+	if (config.noswap)
+		sbinfo->noswap = true;
 out:
 	spin_unlock(&sbinfo->stat_lock);
 	return error;
@@ -3535,6 +3551,8 @@ static int shmem_show_options(struct seq_file *seq, struct dentry *root)
 		seq_printf(seq, ",huge=%s", shmem_format_huge(sbinfo->huge));
 #endif
 	shmem_show_mpol(seq, sbinfo->mpol);
+	if (sbinfo->noswap)
+		seq_printf(seq, ",noswap");
 	return 0;
 }
 
