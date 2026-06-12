@@ -46,10 +46,48 @@ enum {
 };
 
 static const match_table_t tokens = {
-	{Opt_hidepid, "hidepid=%u"},
+	{Opt_hidepid, "hidepid=%s"},
 	{Opt_gid, "gid=%u"},
 	{Opt_err, NULL},
 };
+
+static inline int valid_hidepid(unsigned int value)
+{
+	return value == HIDEPID_OFF ||
+	       value == HIDEPID_NO_ACCESS ||
+	       value == HIDEPID_INVISIBLE;
+}
+
+static int proc_parse_hidepid_param(char *value, struct pid_namespace *pid)
+{
+	unsigned int option;
+
+	if (!value)
+		return -EINVAL;
+
+	if (!kstrtouint(value, 10, &option)) {
+		if (!valid_hidepid(option)) {
+			pr_err("proc: unknown value of hidepid - %s\n", value);
+			return -EINVAL;
+		}
+
+		pid->hide_pid = option;
+		return 0;
+	}
+
+	if (!strcmp(value, "off"))
+		pid->hide_pid = HIDEPID_OFF;
+	else if (!strcmp(value, "noaccess"))
+		pid->hide_pid = HIDEPID_NO_ACCESS;
+	else if (!strcmp(value, "invisible"))
+		pid->hide_pid = HIDEPID_INVISIBLE;
+	else {
+		pr_err("proc: unknown value of hidepid - %s\n", value);
+		return -EINVAL;
+	}
+
+	return 0;
+}
 
 static int proc_parse_options(char *options, struct pid_namespace *pid)
 {
@@ -74,14 +112,8 @@ static int proc_parse_options(char *options, struct pid_namespace *pid)
 			pid->pid_gid = make_kgid(current_user_ns(), option);
 			break;
 		case Opt_hidepid:
-			if (match_int(&args[0], &option))
+			if (proc_parse_hidepid_param(args[0].from, pid))
 				return 0;
-			if (option < HIDEPID_OFF ||
-			    option > HIDEPID_INVISIBLE) {
-				pr_err("proc: hidepid value must be between 0 and 2.\n");
-				return 0;
-			}
-			pid->hide_pid = option;
 			break;
 		default:
 			pr_err("proc: unrecognized mount option \"%s\" "
