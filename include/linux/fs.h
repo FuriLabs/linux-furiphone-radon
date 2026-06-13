@@ -39,6 +39,7 @@
 #include <linux/ioprio.h>
 #include <linux/fs_types.h>
 #include <linux/android_kabi.h>
+#include <linux/mount.h>
 
 #include <asm/byteorder.h>
 #include <uapi/linux/fs.h>
@@ -2227,6 +2228,7 @@ struct file_system_type {
 #define FS_BINARY_MOUNTDATA	2
 #define FS_HAS_SUBTYPE		4
 #define FS_USERNS_MOUNT		8	/* Can be mounted by userns root */
+#define FS_ALLOW_IDMAP         32      /* FS has been updated to handle vfs idmappings. */
 #define FS_RENAME_DOES_D_MOVE	32768	/* FS will handle d_move() during rename() internally. */
 	int (*init_fs_context)(struct fs_context *);
 	const struct fs_parameter_description *parameters;
@@ -2557,6 +2559,10 @@ struct filename {
 	const char		iname[];
 };
 
+static inline struct user_namespace *file_mnt_user_ns(struct file *file)
+{
+	return mnt_user_ns(file->f_path.mnt);
+}
 extern long vfs_truncate(const struct path *, loff_t);
 extern int do_truncate(struct dentry *, loff_t start, unsigned int time_attrs,
 		       struct file *filp);
