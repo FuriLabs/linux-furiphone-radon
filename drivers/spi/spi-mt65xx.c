@@ -117,6 +117,7 @@ struct mtk_spi {
 	const struct mtk_spi_compatible *dev_comp;
 	struct pm_qos_request spi_qos_request;
 	bool dual_touch_support;
+	struct pinctrl *pinctrl;
 };
 
 static const struct mtk_spi_compatible mtk_common_compat;
@@ -572,15 +573,14 @@ static int mtk_spi_fifo_transfer(struct spi_master *master,
 	mtk_spi_prepare_transfer(master, xfer, spi);
 	mtk_spi_setup_packet(master);
 
-	if (xfer->tx_buf) {
-		cnt = xfer->len / 4;
-		iowrite32_rep(mdata->base + SPI_TX_DATA_REG, xfer->tx_buf, cnt);
-		remainder = xfer->len % 4;
-		if (remainder > 0) {
-			reg_val = 0;
-			memcpy(&reg_val, xfer->tx_buf + (cnt * 4), remainder);
-			writel(reg_val, mdata->base + SPI_TX_DATA_REG);
-		}
+	cnt = xfer->len / 4;
+	iowrite32_rep(mdata->base + SPI_TX_DATA_REG, xfer->tx_buf, cnt);
+
+	remainder = xfer->len % 4;
+	if (remainder > 0) {
+		reg_val = 0;
+		memcpy(&reg_val, xfer->tx_buf + (cnt * 4), remainder);
+		writel(reg_val, mdata->base + SPI_TX_DATA_REG);
 	}
 
 	spi_debug("spi setting Done.Dump reg before Transfer start:\n");
@@ -694,7 +694,7 @@ static irqreturn_t mtk_spi_interrupt(int irq, void *dev_id)
 	else
 		mdata->state = MTK_SPI_IDLE;
 
-	if (!master->can_dma(master, NULL, trans)) {
+	if (!master->can_dma(master, master->cur_msg->spi, trans)) {
 		if (trans->rx_buf) {
 			cnt = mdata->xfer_len / 4;
 			ioread32_rep(mdata->base + SPI_RX_DATA_REG,
@@ -720,19 +720,17 @@ static irqreturn_t mtk_spi_interrupt(int irq, void *dev_id)
 		mdata->xfer_len = min(MTK_SPI_MAX_FIFO_SIZE, len);
 		mtk_spi_setup_packet(master);
 
-		if (trans->tx_buf) {
-			cnt = mdata->xfer_len / 4;
-			iowrite32_rep(mdata->base + SPI_TX_DATA_REG,
-					trans->tx_buf + mdata->num_xfered, cnt);
+		cnt = mdata->xfer_len / 4;
+		iowrite32_rep(mdata->base + SPI_TX_DATA_REG,
+				trans->tx_buf + mdata->num_xfered, cnt);
 
-			remainder = mdata->xfer_len % 4;
-			if (remainder > 0) {
-				reg_val = 0;
-				memcpy(&reg_val,
-					trans->tx_buf + (cnt * 4) + mdata->num_xfered,
-					remainder);
-				writel(reg_val, mdata->base + SPI_TX_DATA_REG);
-			}
+		remainder = mdata->xfer_len % 4;
+		if (remainder > 0) {
+			reg_val = 0;
+			memcpy(&reg_val,
+				trans->tx_buf + (cnt * 4) + mdata->num_xfered,
+				remainder);
+			writel(reg_val, mdata->base + SPI_TX_DATA_REG);
 		}
 
 		mtk_spi_enable_transfer(master);
@@ -926,6 +924,15 @@ static int mtk_spi_probe(struct platform_device *pdev)
 		goto err_put_master;
 	}
 
+    mdata->pinctrl = devm_pinctrl_get(&pdev->dev);
+    if (!IS_ERR(mdata->pinctrl)) {
+		ret = pinctrl_select_state(mdata->pinctrl, 
+                    pinctrl_lookup_state(mdata->pinctrl, "default"));
+		if (ret)
+			dev_warn(&pdev->dev, "Failed to select pinctrl default state\n");
+    } else if (PTR_ERR(mdata->pinctrl) != -EPROBE_DEFER) {
+		mdata->pinctrl = NULL;
+    }
 	ret = clk_prepare_enable(mdata->spi_clk);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "failed to enable spi_clk (%d)\n", ret);
