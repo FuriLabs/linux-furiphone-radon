@@ -58,7 +58,6 @@ struct gpio_keys_data {
 };
 struct gpio_keys_data *gData = NULL;
 
-static int gpio_value = 1;
 static ssize_t key_state_show(struct device *dev, 
                              struct device_attribute *attr, 
                              char *buf) {
@@ -78,10 +77,9 @@ static void delayed_sleep_work_fn(struct work_struct *work) {
     struct gpio_keys_data *data = container_of(to_delayed_work(work), 
                                              struct gpio_keys_data, sleep_work);
 
-    if(gpio_value)
-	__pm_relax(data->ws);
+    __pm_relax(data->ws);
 
-    printk(KERN_INFO "Wake lock released after %d ms gpio_value:%d\n", WAKEUP_HOLD_MS,gpio_value);
+    printk(KERN_INFO "Wake lock released after %d ms\n", WAKEUP_HOLD_MS);
 }
 
 static irqreturn_t key_irq_handler(int irq, void *dev_id) {
@@ -98,7 +96,6 @@ static irqreturn_t key_irq_handler(int irq, void *dev_id) {
     __pm_stay_awake(data->ws);
 
     value = gpio_get_value(key->gpio);
-    gpio_value = value;
     mutex_lock(&data->lock);
     key->pressed = (value ? 0 : 1);
     mutex_unlock(&data->lock);
