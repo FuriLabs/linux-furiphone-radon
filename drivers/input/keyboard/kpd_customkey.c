@@ -256,8 +256,10 @@ static int custom_keys_probe(struct platform_device *pdev) {
     }
 
     for (i = 0; i < data->key_count; i++) {
-        ret = devm_request_irq(&pdev->dev, data->keys[i].irq, key_irq_handler,
-                              IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING,
+        ret = devm_request_threaded_irq(&pdev->dev, data->keys[i].irq,
+                              NULL, key_irq_handler,
+                              IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING |
+                              IRQF_ONESHOT,
                               data->keys[i].name, &data->keys[i]);
         if (ret) {
             dev_err(&pdev->dev, "Failed to request IRQ %d for key %s\n", 
