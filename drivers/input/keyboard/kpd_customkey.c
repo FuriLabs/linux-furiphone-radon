@@ -252,6 +252,20 @@ static int custom_keys_probe(struct platform_device *pdev) {
         return ret;
     }
 
+    /* Seed the input core with what the switches actually read. Without this
+     * its state starts at 0 for every code while a latched switch may already
+     * be held, and input_handle_event() then discards the first transition as
+     * a duplicate - so the first flip after boot produces no event at all and
+     * EVIOCGKEY lies about the hardware.
+     */
+    for (i = 0; i < data->key_count; i++) {
+        struct key_config *key = &data->keys[i];
+
+        key->pressed = (gpio_get_value(key->gpio) ? 0 : 1);
+        input_report_key(data->input_dev, key->key_code, key->pressed);
+    }
+    input_sync(data->input_dev);
+
     for (i = 0; i < data->key_count; i++) {
         ret = devm_request_threaded_irq(&pdev->dev, data->keys[i].irq,
                               NULL, key_irq_handler,
